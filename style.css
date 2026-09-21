@@ -259,6 +259,19 @@ tr.clicavel:focus-visible{outline:2px solid var(--amarelo); outline-offset:-2px}
 .chip-sug b{font-family:var(--ff-t); font-size:13.5px; font-weight:600}
 .chip-sug span{font-size:12px; color:var(--txt3)}
 
+/* ------------------------------------------------- níveis de acesso */
+.legenda-niveis{display:grid; gap:10px; margin-bottom:16px}
+@media(min-width:780px){ .legenda-niveis{grid-template-columns:repeat(3,1fr)} }
+.legenda-niveis > div{background:var(--sup2); border:1px solid var(--linha);
+  border-left:3px solid var(--amarelo); border-radius:var(--r2); padding:10px 13px}
+.legenda-niveis b{display:block; font-family:var(--ff-d); font-size:13.5px; margin-bottom:2px}
+.legenda-niveis span{font-size:12.5px; color:var(--txt3); line-height:1.45}
+td select[data-nivel]{padding:7px 9px; font-size:13px}
+
+/* ------------------------------------------------------- histórico */
+tr.desfeita{opacity:.62}
+tr.desfeita .b-proc{text-decoration:line-through}
+
 /* --------------------------------------------------- prévia do e-mail */
 .previa-email{border:1px solid var(--linha); border-radius:var(--r2);
   max-height:340px; overflow:auto; background:#f5f4ef; margin-top:6px}

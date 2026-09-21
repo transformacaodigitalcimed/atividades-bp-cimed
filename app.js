@@ -5,7 +5,7 @@
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=8';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=9';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -148,7 +148,8 @@ async function abrirApp() {
       return;
     }
     el('avatar').textContent = iniciais(perfil.nome);
-    el('nome-usuario').textContent = perfil.nome.split(' ')[0] + (perfil.papel === 'admin' ? ' · Admin' : '');
+    const curto = papelDe(perfil.papel).curto;
+    el('nome-usuario').textContent = perfil.nome.split(' ')[0] + (curto ? ' · ' + curto : '');
     el('topo-sub').textContent = 'Ritmo, Rotina e Ritual · BPs ' + perfil.unidade;
     await Promise.all([carregarCatalogo(), carregarRegistros(), carregarPerfis()]);
     montarAbas();
@@ -162,7 +163,7 @@ async function abrirApp() {
   }
 }
 function fecharApp() {
-  perfil = null; registros = []; perfis = []; catalogo = [];
+  perfil = null; registros = []; perfis = []; catalogo = []; historico = []; convites = [];
   el('app').hidden = true;
   el('tela-login').hidden = false;
   el('login-senha').value = '';
@@ -206,9 +207,10 @@ function montarAbas() {
     ['quadro', 'Quadro'],
     ['meus', 'Meus registros'],
     ['painel', 'Painel'],
-    ['catalogo', 'Catálogo de atividades']
+    ['catalogo', 'Catálogo de atividades'],
+    ['historico', 'Histórico']
   ];
-  if (perfil.papel === 'admin') lista.push(['gestao', 'Gestão']);
+  if (ehAdmin()) lista.push(['gestao', 'Gestão']);
   el('abas').innerHTML = lista.map(([k, r]) =>
     `<button class="aba" role="tab" data-aba="${k}" aria-selected="${k === aba}">${r}</button>`).join('');
   el('abas').querySelectorAll('.aba').forEach(b => b.onclick = () => ir(b.dataset.aba));
@@ -223,6 +225,7 @@ function ir(nova) {
   else if (aba === 'meus') telaMeus(c);
   else if (aba === 'painel') telaPainel(c);
   else if (aba === 'catalogo') telaCatalogo(c);
+  else if (aba === 'historico') telaHistorico(c);
   else telaGestao(c);
 }
 
@@ -381,6 +384,18 @@ function realcarMencoes(texto) {
 
 const meMarcaram = r => Array.isArray(r.mencionados) && r.mencionados.includes(perfil.id);
 const meuRegistro = r => r.usuario_id === perfil.id;
+
+/* Três níveis de acesso. A palavra final é sempre da RLS do banco:
+   aqui a gente só decide o que mostrar na tela. */
+const ehAdmin = () => perfil.papel === 'admin';                                  // cadastra, convida, troca nível
+const veTudo  = () => perfil.papel === 'admin' || perfil.papel === 'completo';   // enxerga e edita a base inteira
+const PAPEIS = {
+  bp:       { rotulo: 'BP',            curto: '',                 cor: 't-neu' },
+  completo: { rotulo: 'Visão completa', curto: 'Visão completa',  cor: 't-es'  },
+  admin:    { rotulo: 'Administrador',  curto: 'Admin',           cor: 't-am'  }
+};
+const papelDe = p => PAPEIS[p] || PAPEIS.bp;
+const equipeLancadora = () => perfis.filter(u => u.ativo);
 
 /* =====================================================================
    5b. Ditado por voz (Web Speech API, em português)
@@ -639,11 +654,13 @@ function renderUltimos() {
    6. Tabela de registros
    ===================================================================== */
 function nomeDe(id) {
+  if (!id) return 'sistema';
+  if (perfil && id === perfil.id) return perfil.nome;
   const p = perfis.find(x => x.id === id);
   return p ? p.nome : 'Outra BP';
 }
 function tabelaRegistros(lista, comAcoes) {
-  const mostraBp = perfil.papel === 'admin' || lista.some(r => !meuRegistro(r));
+  const mostraBp = veTudo() || lista.some(r => !meuRegistro(r));
   return `<div class="tabela-wrap"><table>
   <thead><tr>
     <th style="width:88px">Data</th>${mostraBp ? '<th style="width:130px">BP</th>' : ''}
@@ -662,7 +679,7 @@ function tabelaRegistros(lista, comAcoes) {
     <td class="mini" data-r="Área">${esc(r.area || '')}</td>
     <td class="num" data-r="Tempo">${horas(r.minutos)}</td>
     <td data-r="Situação"><span class="tag ${r.status === 'Concluída' ? 't-es' : (r.status === 'Em andamento' ? 't-am' : 't-neu')}">${esc(r.status)}</span></td>
-    ${comAcoes ? `<td>${meuRegistro(r) || perfil.papel === 'admin'
+    ${comAcoes ? `<td>${meuRegistro(r) || veTudo()
       ? `<button class="bt sec peq" data-apagar="${r.id}">Apagar</button>`
       : '<span class="mini">só leitura</span>'}</td>` : ''}
   </tr>`).join('')}
@@ -685,10 +702,10 @@ function ligarApagar() {
 const COR_STATUS = { 'Pendente': 'var(--parado)', 'Em andamento': 'var(--s4)', 'Concluída': 'var(--s3)' };
 
 function telaQuadro(c) {
-  const seletorBp = perfil.papel === 'admin'
+  const seletorBp = veTudo()
     ? `<div><label class="lab" for="q-bp">Business Partner</label>
         <select id="q-bp"><option value="">Todas as BPs</option>
-        ${perfis.filter(u => u.papel === 'bp').map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')}
+        ${equipeLancadora().map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')}
         </select></div>` : '';
   c.innerHTML = `
   <div class="card">
@@ -752,7 +769,7 @@ function renderQuadro() {
 
 function cartao(r) {
   const outros = STATUS.filter(s => s !== r.status);
-  const posso = meuRegistro(r) || perfil.papel === 'admin';
+  const posso = meuRegistro(r) || veTudo();
   const deOutra = !meuRegistro(r);
   return `<article class="cartao${posso ? '' : ' so-leitura'}" ${posso ? 'draggable="true"' : ''} data-reg="${r.id}">
     <div class="ct-tit">${esc(r.atividade)}</div>
@@ -814,8 +831,8 @@ async function moverRegistro(id, novoStatus) {
 function telaMeus(c) {
   c.innerHTML = `
   <div class="card">
-    <h3>${perfil.papel === 'admin' ? 'Registros da equipe' : 'Meus registros'}</h3>
-    <p class="sub">${perfil.papel === 'admin'
+    <h3>${veTudo() ? 'Registros da equipe' : 'Meus registros'}</h3>
+    <p class="sub">${veTudo()
       ? 'Tudo que as BPs lançaram, com filtros e exportação.'
       : 'Tudo que você lançou, com filtros e exportação.'}</p>
     <div class="filtros">
@@ -870,10 +887,10 @@ function renderMeus() {
    8. Tela: painel
    ===================================================================== */
 function telaPainel(c) {
-  const seletorBp = perfil.papel === 'admin'
+  const seletorBp = veTudo()
     ? `<div><label class="lab" for="p-bp">Business Partner</label>
         <select id="p-bp"><option value="">Todas as BPs</option>
-        ${perfis.filter(u => u.papel === 'bp').map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')}
+        ${equipeLancadora().map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')}
         </select></div>` : '';
   c.innerHTML = `
   <div class="card">
@@ -901,7 +918,7 @@ function telaPainel(c) {
   <div class="card"><h3>Evolução semanal</h3>
     <p class="sub">Horas lançadas por semana, das mais antigas às mais recentes.</p>
     <div id="ch-sem"></div></div>
-  ${perfil.papel === 'admin' ? `<div class="card"><h3>Comparativo entre as BPs</h3>
+  ${veTudo() ? `<div class="card"><h3>Comparativo entre as BPs</h3>
     <p class="sub">Horas e perfil de atuação de cada Business Partner no período.</p>
     <div id="ch-bps"></div></div>` : ''}`;
   ['p-periodo', 'p-processo', 'p-bp'].forEach(id => { const e = el(id); if (e) e.onchange = renderPainel; });
@@ -947,7 +964,7 @@ function renderPainel() {
   el('ch-sem').innerHTML = barrasV(porSemana(l));
 
   if (el('ch-bps')) {
-    const linhas = perfis.filter(u => u.papel === 'bp').map(u => {
+    const linhas = equipeLancadora().map(u => {
       const rs = l.filter(r => r.usuario_id === u.id);
       const m = rs.reduce((s, r) => s + r.minutos, 0);
       return {
@@ -1169,7 +1186,7 @@ function abrirFicha(a) {
     <div class="rodape">
       <button class="bt" id="fi-salvar">${nova ? 'Criar atividade' : 'Salvar alterações'}</button>
       <button class="bt sec" id="fi-cancelar">Cancelar</button>
-      ${!nova && perfil.papel === 'admin'
+      ${!nova && veTudo()
         ? '<button class="bt sec direita" id="fi-desativar">Tirar do catálogo</button>' : ''}
     </div>`);
 
@@ -1251,6 +1268,134 @@ function traduzErroCatalogo(e) {
   return traduzErro(e);
 }
 
+
+/* =====================================================================
+   10b. Tela: histórico, com desfazer
+   O banco anota sozinho cada criação, alteração e exclusão, guardando
+   como o registro estava antes. É isso que permite voltar atrás.
+   ===================================================================== */
+const ACOES = {
+  criou:   { rotulo: 'Criou',   cor: 't-es',  desfazer: 'Apagar de novo' },
+  alterou: { rotulo: 'Alterou', cor: 't-am',  desfazer: 'Voltar como estava' },
+  apagou:  { rotulo: 'Apagou',  cor: 't-sai', desfazer: 'Restaurar' }
+};
+let historico = [];
+
+function telaHistorico(c) {
+  c.innerHTML = `
+  <div class="card">
+    <h3>Histórico</h3>
+    <p class="sub">Tudo o que foi lançado, alterado e apagado, do mais recente para o mais
+      antigo. Errou alguma coisa? Dá para voltar atrás sem precisar refazer na mão.</p>
+    <div id="h-msg"></div>
+    <div class="filtros">
+      <div><label class="lab" for="h-periodo">Período</label>
+        <select id="h-periodo"><option value="30" selected>Últimos 30 dias</option>
+        <option value="7">Últimos 7 dias</option><option value="90">Últimos 90 dias</option>
+        <option value="tudo">Tudo</option></select></div>
+      <div><label class="lab" for="h-acao">O que aconteceu</label>
+        <select id="h-acao"><option value="">Tudo</option>
+        <option value="criou">Criações</option><option value="alterou">Alterações</option>
+        <option value="apagou">Exclusões</option></select></div>
+      <div><label class="lab" for="h-entidade">Onde</label>
+        <select id="h-entidade"><option value="">Tudo</option>
+        <option value="registro">Registros do dia a dia</option>
+        <option value="atividade">Catálogo de atividades</option></select></div>
+      <div style="flex:0 0 auto"><button class="bt sec" id="h-recarregar">Atualizar</button></div>
+    </div>
+    <div id="h-lista"><div class="carregando">Carregando o histórico…</div></div>
+  </div>`;
+  ['h-periodo', 'h-acao', 'h-entidade'].forEach(id => el(id).onchange = renderHistorico);
+  el('h-recarregar').onclick = () => carregarHistorico(true);
+  carregarHistorico();
+}
+
+async function carregarHistorico(recarregar) {
+  if (historico.length && !recarregar) { renderHistorico(); return; }
+  const { data, error } = await sb.from('bp_historico').select('*')
+    .order('quando', { ascending: false }).limit(500);
+  if (error) {
+    el('h-lista').innerHTML = /bp_historico/i.test(error.message || '')
+      ? '<div class="aviso"><span>&#9888;</span><div>Falta rodar o arquivo <b>07-historico.sql</b> no Supabase para esta aba funcionar.</div></div>'
+      : `<div class="vazio">${esc(traduzErro(error))}</div>`;
+    return;
+  }
+  historico = data || [];
+  renderHistorico();
+}
+
+function filtrarHistorico() {
+  const per = el('h-periodo').value, ac = el('h-acao').value, ent = el('h-entidade').value;
+  return historico
+    .filter(h => noPeriodo(h.quando.slice(0, 10), per))
+    .filter(h => !ac || h.acao === ac)
+    .filter(h => !ent || h.entidade === ent);
+}
+
+function renderHistorico() {
+  const l = filtrarHistorico();
+  if (!l.length) {
+    el('h-lista').innerHTML = '<div class="vazio">Nada no histórico com esses filtros.</div>';
+    return;
+  }
+  el('h-lista').innerHTML = `
+    <div class="mini" style="margin-bottom:10px">${l.length} ${l.length === 1 ? 'item' : 'itens'}</div>
+    <div class="tabela-wrap"><table>
+    <thead><tr><th style="width:120px">Quando</th><th style="width:104px">O quê</th>
+      <th>Item</th><th style="width:130px">Quem</th><th style="width:152px"></th></tr></thead>
+    <tbody>${l.map(h => {
+      const a = ACOES[h.acao] || ACOES.alterou;
+      const posso = !h.desfeito_em && (veTudo() || h.dono_id === perfil.id || h.entidade === 'atividade');
+      return `<tr${h.desfeito_em ? ' class="desfeita"' : ''}>
+        <td data-r="Quando" class="mini num">${dataHora(h.quando)}</td>
+        <td data-r="O quê"><span class="tag ${a.cor}">${a.rotulo}</span></td>
+        <td data-r="Item"><div><div class="b-proc">${esc(h.resumo)}</div>
+          <div class="mini">${h.entidade === 'registro' ? 'registro do dia a dia' : 'catálogo de atividades'}${h.desfeito_em ? ' · desfeito em ' + dataHora(h.desfeito_em) : ''}</div></div></td>
+        <td data-r="Quem" class="mini">${esc(nomeDe(h.quem))}</td>
+        <td>${posso
+          ? `<button class="bt sec peq" data-desfazer="${h.id}">${a.desfazer}</button>`
+          : (h.desfeito_em ? '<span class="mini">desfeito</span>' : '<span class="mini">só leitura</span>')}</td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+
+  document.querySelectorAll('[data-desfazer]').forEach(b => b.onclick = () => {
+    const h = historico.find(x => String(x.id) === b.dataset.desfazer);
+    const a = ACOES[h.acao] || ACOES.alterou;
+    confirmar(a.desfazer + '?',
+      h.acao === 'apagou' ? 'O item volta exatamente como estava antes de ser apagado.'
+      : h.acao === 'criou' ? 'O item que foi criado nessa ação sai da lista.'
+      : 'Os campos voltam aos valores anteriores a essa alteração.',
+      () => desfazer(h, b));
+  });
+}
+
+async function desfazer(h, botao) {
+  botao.disabled = true;
+  const rotuloOriginal = botao.textContent;
+  botao.textContent = 'Desfazendo…';
+  try {
+    const { data, error } = await sb.rpc('bp_desfazer', { p_historico_id: h.id });
+    if (error) throw error;
+    if (data !== 'ok') { mostrarMsg('h-msg', 'erro', data); return; }
+    await Promise.all([carregarRegistros(), carregarCatalogo()]);
+    await carregarHistorico(true);
+    mostrarMsg('h-msg', 'ok', 'Feito, voltei atrás nessa ação.');
+  } catch (e) {
+    mostrarMsg('h-msg', 'erro', /bp_desfazer|function/i.test(e.message || '')
+      ? 'Falta rodar o arquivo 07-historico.sql no Supabase.' : traduzErro(e));
+  } finally {
+    botao.disabled = false;
+    botao.textContent = rotuloOriginal;
+  }
+}
+
+function dataHora(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' +
+         d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
 /* =====================================================================
    11. Tela: gestão (só administrador)
    ===================================================================== */
@@ -1269,6 +1414,15 @@ function telaGestao(c) {
       <div><label class="lab" for="cv-cargo">Cargo</label>
         <input type="text" id="cv-cargo" value="Business Partner"></div>
     </div>
+    <div class="linha-campos lc2" style="margin-top:14px">
+      <div><label class="lab" for="cv-papel">Nível de acesso</label>
+        <select id="cv-papel">
+          <option value="bp">BP · vê só os próprios lançamentos</option>
+          <option value="completo">Visão completa · vê e edita os de todas</option>
+        </select>
+        <div class="mini" style="margin-top:6px">Ela já entra com esse nível, sem depender de você ajustar depois.</div>
+      </div>
+    </div>
     <div class="acoes" style="margin-top:14px">
       <button class="bt" id="btn-convidar">Cadastrar e preparar e-mail</button>
     </div>
@@ -1285,7 +1439,7 @@ function telaGestao(c) {
     <p class="sub">Todos os registros de todas as BPs, para levar para a reunião de gente e gestão.</p>
     <div class="acoes"><button class="bt sec" id="btn-csv-tudo">Exportar tudo em CSV</button></div>
     <div class="mini" style="margin-top:12px">
-      ${nfmt(registros.length)} registros na base · ${nfmt(perfis.filter(p => p.papel === 'bp').length)} BPs com acesso
+      ${nfmt(registros.length)} registros na base · ${nfmt(perfis.filter(p => p.ativo).length)} pessoas com acesso
     </div>
   </div>`;
   renderPerfis();
@@ -1324,7 +1478,8 @@ function renderConvites() {
     <thead><tr><th>Pessoa</th><th style="width:210px">E-mail</th>
       <th style="width:150px">Situação</th><th style="width:200px"></th></tr></thead>
     <tbody>${convites.map(c => `<tr>
-      <td data-r="Pessoa"><div><b>${esc(c.nome)}</b><div class="mini">${esc(c.cargo)}</div></div></td>
+      <td data-r="Pessoa"><div><b>${esc(c.nome)}</b><div class="mini">${esc(c.cargo)}
+        ${c.papel && c.papel !== 'bp' ? ' · ' + esc(papelDe(c.papel).rotulo) : ''}</div></div></td>
       <td class="mini" data-r="E-mail">${esc(c.email)}</td>
       <td data-r="Situação"><span class="tag ${c.entrou_em ? 't-es' : 't-am'}">
         ${c.entrou_em ? 'Entrou em ' + new Date(c.entrou_em).toLocaleDateString('pt-BR') : 'Aguardando'}</span></td>
@@ -1360,7 +1515,9 @@ async function convidar() {
   const botao = el('btn-convidar');
   botao.disabled = true; botao.textContent = 'Cadastrando…';
   try {
-    const registro = { email, nome, cargo, unidade: CONFIG.unidade, convidada_por: perfil.id };
+    const registro = { email, nome, cargo, unidade: CONFIG.unidade,
+                       papel: el('cv-papel') ? el('cv-papel').value : 'bp',
+                       convidada_por: perfil.id };
     const { data, error } = await sb.from('bp_convites')
       .upsert(registro, { onConflict: 'email' }).select().single();
     if (error) throw error;
@@ -1378,6 +1535,14 @@ async function convidar() {
 }
 
 const ASSUNTO_CONVITE = 'Ritmo: seu acesso, e o que ele resolve pra você';
+
+/* O parágrafo sobre acesso precisa dizer a verdade para cada nível:
+   prometer sigilo a quem tem visão completa seria escrever algo falso. */
+function textoAcesso(papel) {
+  return papel === 'completo' || papel === 'admin'
+    ? '<b>Sobre o seu acesso:</b> ele é de visão completa. Você enxerga e edita os lançamentos de todas as BPs, para conseguir apoiar e dar continuidade quando precisar. As BPs enxergam apenas os próprios. E a senha é sua, ninguém mais tem acesso a ela.'
+    : '<b>É um espaço seu:</b> você vê e edita apenas os seus próprios lançamentos. O registro de uma não aparece para a outra, a não ser quando é marcada nele. E a senha é sua, ninguém mais tem acesso a ela.';
+}
 
 /* Os cinco ganhos que o e-mail promete. Mexer aqui muda o e-mail inteiro,
    tanto a versão em HTML quanto a em texto puro. */
@@ -1453,9 +1618,7 @@ function emailHtml(c) {
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
         style="margin:0 0 24px;background:#FFF3CC;border-radius:10px">
         <tr><td style="padding:14px 16px;font-size:14px;color:#7a5600;line-height:1.6">
-          <b>É um espaço seu:</b> você vê e edita apenas os seus próprios lançamentos.
-          O registro de uma não aparece para a outra, a não ser quando é marcada nele.
-          E a senha é sua, ninguém mais tem acesso a ela.
+          ${textoAcesso(c.papel)}
         </td></tr>
       </table>
 
@@ -1514,8 +1677,8 @@ O QUE MUDA NO SEU DIA A DIA
 
 ${GANHOS.map(([t, d]) => '- ' + t + ': ' + d).join('\n\n')}
 
-É UM ESPAÇO SEU
-Você vê e edita apenas os seus próprios lançamentos. O registro de uma não aparece para a outra, a não ser quando é marcada nele. E a senha é sua, ninguém mais tem acesso a ela.
+SOBRE O SEU ACESSO
+${textoAcesso(c.papel).replace(/<[^>]+>/g, '')}
 
 PARA ENTRAR
 1. Abra ${CONFIG.urlSite}
@@ -1589,24 +1752,41 @@ function janelaEmail(c) {
   };
 }
 function renderPerfis() {
-  el('lista-perfis').innerHTML = `<div class="tabela-wrap"><table>
-    <thead><tr><th>Nome</th><th style="width:210px">E-mail</th><th style="width:110px">Perfil</th>
-      <th style="width:96px">Registros</th><th style="width:96px">Situação</th><th style="width:190px"></th></tr></thead>
+  el('lista-perfis').innerHTML = `
+  <div class="legenda-niveis">
+    <div><b>BP</b><span>Vê e edita apenas os próprios lançamentos, mais os que marcam ela com @</span></div>
+    <div><b>Visão completa</b><span>Vê e edita os lançamentos de todas. Não mexe em acessos</span></div>
+    <div><b>Administrador</b><span>Tudo da visão completa, mais cadastrar, convidar e mudar nível</span></div>
+  </div>
+  <div class="tabela-wrap"><table>
+    <thead><tr><th>Nome</th><th style="width:200px">E-mail</th><th style="width:168px">Nível de acesso</th>
+      <th style="width:92px">Registros</th><th style="width:92px">Situação</th><th style="width:106px"></th></tr></thead>
     <tbody>${perfis.map(u => `<tr>
       <td data-r="Nome"><div><b>${esc(u.nome)}</b><div class="mini">${esc(u.cargo)} · ${esc(u.unidade)}</div></div></td>
       <td class="mini" data-r="E-mail">${esc(u.email)}</td>
-      <td data-r="Perfil"><span class="tag ${u.papel === 'admin' ? 't-am' : 't-neu'}">${u.papel === 'admin' ? 'Administrador' : 'BP'}</span></td>
+      <td data-r="Nível">${u.id === perfil.id
+        ? `<span class="tag ${papelDe(u.papel).cor}">${papelDe(u.papel).rotulo}</span>
+           <div class="mini" style="margin-top:3px">é você</div>`
+        : `<select data-nivel="${u.id}">${Object.keys(PAPEIS).map(k =>
+            `<option value="${k}" ${u.papel === k ? 'selected' : ''}>${PAPEIS[k].rotulo}</option>`).join('')}</select>`}</td>
       <td class="num" data-r="Registros">${registros.filter(r => r.usuario_id === u.id).length}</td>
       <td data-r="Situação"><span class="tag ${u.ativo ? 't-es' : 't-neu'}">${u.ativo ? 'Ativa' : 'Pausada'}</span></td>
-      <td>${u.id === perfil.id ? '<span class="mini">é você</span>' : `<div class="acoes">
-        <button class="bt sec peq" data-papel="${u.id}">${u.papel === 'admin' ? 'Tornar BP' : 'Tornar Administrador'}</button>
-        <button class="bt sec peq" data-ativo="${u.id}">${u.ativo ? 'Pausar' : 'Reativar'}</button>
-      </div>`}</td>
+      <td>${u.id === perfil.id ? '' :
+        `<button class="bt sec peq" data-ativo="${u.id}">${u.ativo ? 'Pausar' : 'Reativar'}</button>`}</td>
     </tr>`).join('')}</tbody></table></div>`;
 
-  document.querySelectorAll('[data-papel]').forEach(b => b.onclick = async () => {
-    const u = perfis.find(x => x.id === b.dataset.papel);
-    await atualizarPerfil(u, { papel: u.papel === 'admin' ? 'bp' : 'admin' });
+  document.querySelectorAll('[data-nivel]').forEach(s => s.onchange = async () => {
+    const u = perfis.find(x => x.id === s.dataset.nivel);
+    const anterior = u.papel;
+    const novo = s.value;
+    if (novo === 'admin') {
+      confirmar('Tornar ' + u.nome + ' administradora?',
+        'Ela passa a poder cadastrar pessoas, convidar e mudar o nível de acesso das outras, inclusive o seu.',
+        () => atualizarPerfil(u, { papel: novo }),
+        () => { s.value = anterior; });
+      return;
+    }
+    await atualizarPerfil(u, { papel: novo });
   });
   document.querySelectorAll('[data-ativo]').forEach(b => b.onclick = async () => {
     const u = perfis.find(x => x.id === b.dataset.ativo);
@@ -1652,12 +1832,13 @@ function aviso(txt) {
   abrirDlg(`<h3>${esc(txt)}</h3><div class="acoes"><button class="bt" id="dlg-fechar">Entendi</button></div>`);
   el('dlg-fechar').onclick = () => el('dlg').close();
 }
-function confirmar(titulo, texto, ok) {
+function confirmar(titulo, texto, ok, aoCancelar) {
   abrirDlg(`<h3>${esc(titulo)}</h3><p class="mini" style="margin:-8px 0 16px">${esc(texto)}</p>
     <div class="acoes"><button class="bt" id="dlg-ok">Confirmar</button>
     <button class="bt sec" id="dlg-fechar">Cancelar</button></div>`);
-  el('dlg-fechar').onclick = () => el('dlg').close();
-  el('dlg-ok').onclick = () => { el('dlg').close(); ok(); };
+  el('dlg-fechar').onclick = () => { el('dlg').close(); if (aoCancelar) aoCancelar(); };
+  el('dlg').onclose = () => { if (aoCancelar) aoCancelar(); };
+  el('dlg-ok').onclick = () => { el('dlg').onclose = null; el('dlg').close(); ok(); };
 }
 function alternarTema() {
   const atual = document.documentElement.getAttribute('data-tema');
