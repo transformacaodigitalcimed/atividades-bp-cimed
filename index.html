@@ -12,7 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Ao alterar style.css ou app.js, some 1 no ?v= das duas linhas.
      Isso força o navegador a buscar a versão nova em vez da guardada em cache. -->
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -60,6 +60,13 @@
       <span class="tit"><b>Ritmo</b><span id="topo-sub">Ritmo, Rotina e Ritual · BPs Pouso Alegre</span></span>
       <div class="topo-dir">
         <span class="chip-user"><span class="av" id="avatar">·</span><span id="nome-usuario">·</span></span>
+        <button class="bt-ico com-selo" id="btn-sino" title="Novidades e pendências" aria-label="Novidades e pendências" hidden>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <span class="selo-num" id="sino-num" hidden>0</span>
+        </button>
+        <button class="bt-ico" id="btn-olho" title="Ver o sistema como outra pessoa" aria-label="Ver o sistema como outra pessoa" hidden>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
         <button class="bt-ico" id="btn-tema" title="Alternar tema claro e escuro" aria-label="Alternar tema claro e escuro">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
         </button>
@@ -69,6 +76,7 @@
       </div>
     </div>
     <nav class="abas" id="abas" role="tablist"></nav>
+    <div id="faixa-visao" hidden></div>
   </header>
   <main id="conteudo"><div class="carregando">Carregando seus dados…</div></main>
 </div>
@@ -76,6 +84,6 @@
 <div id="tip" role="status"></div>
 <dialog id="dlg"><div class="dlg-corpo" id="dlg-corpo"></div></dialog>
 
-<script type="module" src="app.js?v=9"></script>
+<script type="module" src="app.js?v=10"></script>
 </body>
 </html>

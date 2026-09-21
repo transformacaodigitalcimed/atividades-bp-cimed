@@ -259,6 +259,54 @@ tr.clicavel:focus-visible{outline:2px solid var(--amarelo); outline-offset:-2px}
 .chip-sug b{font-family:var(--ff-t); font-size:13.5px; font-weight:600}
 .chip-sug span{font-size:12px; color:var(--txt3)}
 
+/* --------------------------------------------------- sininho e olho */
+.bt-ico.com-selo{position:relative}
+.selo-num{position:absolute; top:-5px; right:-5px; min-width:17px; height:17px;
+  padding:0 4px; border-radius:999px; background:#c0392b; color:#fff;
+  font-family:var(--ff-d); font-weight:700; font-size:10.5px; line-height:17px;
+  text-align:center; border:2px solid var(--sup); box-sizing:content-box}
+.bt-ico.tem-novidade{border-color:var(--amarelo); color:var(--txt)}
+
+#faixa-visao{display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  background:var(--amarelo-fundo); border-top:1px solid rgba(251,196,0,.45);
+  color:var(--amarelo-tinta); font-size:13px; padding:9px 22px;
+  max-width:1280px; margin:0 auto}
+#faixa-visao button{margin-left:auto}
+
+.grupo-sino{margin-bottom:16px}
+.grupo-sino h4{margin:0 0 7px; font-size:12px; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--txt3); font-family:var(--ff-d)}
+.item-sino{display:flex; flex-direction:column; align-items:flex-start; gap:1px;
+  width:100%; text-align:left; background:var(--sup2); border:1px solid var(--linha);
+  border-radius:var(--r2); padding:10px 13px; margin-bottom:7px; cursor:pointer}
+.item-sino:hover{border-color:var(--amarelo); background:var(--amarelo-fundo)}
+.item-sino .is-tit{font-size:13.5px; font-weight:600; color:var(--txt)}
+.item-sino .is-sub{font-size:12.5px; color:var(--txt3)}
+
+.lista-olho{display:grid; gap:7px; max-height:46vh; overflow:auto}
+.item-olho{display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  background:var(--sup2); border:1px solid var(--linha); border-radius:var(--r2);
+  padding:9px 12px; cursor:pointer}
+.item-olho:hover{border-color:var(--amarelo); background:var(--amarelo-fundo)}
+.item-olho > span:last-child{display:flex; flex-direction:column; min-width:0}
+.item-olho b{font-size:13.5px; font-weight:600}
+
+/* -------------------------------------------- conversa das sugestões */
+.conversa{display:grid; gap:10px; max-height:40vh; overflow:auto;
+  background:var(--sup2); border:1px solid var(--linha);
+  border-radius:var(--r2); padding:12px}
+.fala{background:var(--sup); border:1px solid var(--linha);
+  border-radius:var(--r2); padding:10px 13px}
+.fala.minha{background:var(--amarelo-fundo); border-color:rgba(251,196,0,.4)}
+.fala-topo{display:flex; justify-content:space-between; gap:10px; align-items:baseline;
+  margin-bottom:4px}
+.fala-topo b{font-family:var(--ff-d); font-size:13px}
+.fala-topo span{font-size:11.5px; color:var(--txt3); font-variant-numeric:tabular-nums}
+.fala-texto{font-size:14px; line-height:1.5}
+
+/* --------------------------------------- caixa do texto ditado */
+#ditado-caixa textarea{min-height:76px; background:var(--sup)}
+
 /* ------------------------------------------------- níveis de acesso */
 .legenda-niveis{display:grid; gap:10px; margin-bottom:16px}
 @media(min-width:780px){ .legenda-niveis{grid-template-columns:repeat(3,1fr)} }

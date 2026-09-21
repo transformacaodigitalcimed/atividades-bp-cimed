@@ -5,7 +5,7 @@
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=9';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=10';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -150,8 +150,11 @@ async function abrirApp() {
     el('avatar').textContent = iniciais(perfil.nome);
     const curto = papelDe(perfil.papel).curto;
     el('nome-usuario').textContent = perfil.nome.split(' ')[0] + (curto ? ' · ' + curto : '');
+    el('avatar').textContent = iniciais(perfil.nome);
     el('topo-sub').textContent = 'Ritmo, Rotina e Ritual · BPs ' + perfil.unidade;
     await Promise.all([carregarCatalogo(), carregarRegistros(), carregarPerfis()]);
+    await carregarSugestoes(true);   // silencioso, alimenta o sininho
+    montarSinoEOlho();
     montarAbas();
     ir('registrar');
   } catch (e) {
@@ -164,6 +167,7 @@ async function abrirApp() {
 }
 function fecharApp() {
   perfil = null; registros = []; perfis = []; catalogo = []; historico = []; convites = [];
+  sugestoes = []; mensagens = [];
   el('app').hidden = true;
   el('tela-login').hidden = false;
   el('login-senha').value = '';
@@ -208,7 +212,8 @@ function montarAbas() {
     ['meus', 'Meus registros'],
     ['painel', 'Painel'],
     ['catalogo', 'Catálogo de atividades'],
-    ['historico', 'Histórico']
+    ['historico', 'Histórico'],
+    ['sugestoes', 'Sugestões']
   ];
   if (ehAdmin()) lista.push(['gestao', 'Gestão']);
   el('abas').innerHTML = lista.map(([k, r]) =>
@@ -226,6 +231,7 @@ function ir(nova) {
   else if (aba === 'painel') telaPainel(c);
   else if (aba === 'catalogo') telaCatalogo(c);
   else if (aba === 'historico') telaHistorico(c);
+  else if (aba === 'sugestoes') telaSugestoes(c);
   else telaGestao(c);
 }
 
@@ -382,13 +388,31 @@ function realcarMencoes(texto) {
   return h;
 }
 
-const meMarcaram = r => Array.isArray(r.mencionados) && r.mencionados.includes(perfil.id);
-const meuRegistro = r => r.usuario_id === perfil.id;
+const meMarcaram = r => Array.isArray(r.mencionados) && r.mencionados.includes(euEfetivo());
+const meuRegistro = r => r.usuario_id === euEfetivo();
 
 /* Três níveis de acesso. A palavra final é sempre da RLS do banco:
    aqui a gente só decide o que mostrar na tela. */
-const ehAdmin = () => perfil.papel === 'admin';                                  // cadastra, convida, troca nível
-const veTudo  = () => perfil.papel === 'admin' || perfil.papel === 'completo';   // enxerga e edita a base inteira
+/* "Ver como": só o administrador liga isso, e serve para conferir como o
+   sistema aparece para cada pessoa. É sempre SÓ LEITURA, para ninguém
+   lançar nada em nome de outra. `null` = vendo com os próprios olhos. */
+let vendoComo = null;
+
+const ehAdminDeVerdade = () => perfil.papel === 'admin';
+const simulando = () => vendoComo !== null;
+const papelEfetivo = () => simulando() ? vendoComo.papel : perfil.papel;
+const euEfetivo = () => simulando() ? vendoComo.id : perfil.id;
+
+const ehAdmin = () => papelEfetivo() === 'admin';                                  // cadastra, convida, troca nível
+const veTudo  = () => papelEfetivo() === 'admin' || papelEfetivo() === 'completo';  // enxerga e edita a base inteira
+
+/* Trava de escrita enquanto estiver vendo como outra pessoa. */
+function travadoNaVisao(idMsg) {
+  if (!simulando()) return false;
+  const recado = 'Você está vendo como ' + vendoComo.nome + '. Essa visão é só para conferir, não grava nada. Saia dela para editar.';
+  if (idMsg && el(idMsg)) mostrarMsg(idMsg, 'erro', recado); else aviso(recado);
+  return true;
+}
 const PAPEIS = {
   bp:       { rotulo: 'BP',            curto: '',                 cor: 't-neu' },
   completo: { rotulo: 'Visão completa', curto: 'Visão completa',  cor: 't-es'  },
@@ -458,7 +482,15 @@ function blocoDitado() {
       <span class="mini" style="flex:1 1 180px">Fale o que você fez. Eu procuro a atividade
         no catálogo e preencho os campos.</span>
     </div>
-    <div id="ditado-texto" hidden></div>
+    <div id="ditado-caixa" hidden>
+      <textarea id="ditado-texto" placeholder="O que você falar aparece aqui"
+        aria-label="Texto ditado, dá para editar"></textarea>
+      <div class="acoes" style="margin-top:8px">
+        <button type="button" class="bt sec peq" id="btn-ditado-limpar">Limpar</button>
+        <button type="button" class="bt sec peq" id="btn-ditado-obs">Usar nas observações</button>
+        <span class="mini">Dá para corrigir e apagar à mão, é um campo de texto normal.</span>
+      </div>
+    </div>
     <div id="ditado-sug"></div>
   </div>`;
 }
@@ -496,13 +528,33 @@ function ligarVoz() {
 
   const bt = el('btn-ditar');
   if (!bt) return;
+  const campo = el('ditado-texto');
+
+  // O texto ditado é editável: as sugestões acompanham o que está escrito,
+  // venha da fala ou do teclado.
+  campo.oninput = () => { ultimoDitado = campo.value; mostrarSugestoes(campo.value); };
+  el('btn-ditado-limpar').onclick = () => {
+    pararVoz();
+    campo.value = ''; ultimoDitado = '';
+    el('ditado-sug').innerHTML = '';
+    campo.focus();
+  };
+  el('btn-ditado-obs').onclick = () => {
+    const obs = el('f-obs');
+    const texto = campo.value.trim();
+    if (!texto) return;
+    obs.value = obs.value.trim() ? obs.value.trim() + ' ' + texto : texto;
+    obs.focus();
+  };
+
   bt.onclick = () => {
     if (bt.classList.contains('gravando')) { pararVoz(); return; }
     pararVoz();
     bt.classList.add('gravando');
     bt.querySelector('span').textContent = 'Ouvindo, toque para parar';
-    el('ditado-texto').hidden = false;
-    el('ditado-texto').textContent = 'Fale agora…';
+    el('ditado-caixa').hidden = false;
+    // Mantém o que já estava escrito e vai acrescentando a fala no fim
+    const base = campo.value.trim() ? campo.value.trim() + ' ' : '';
     const encerra = () => {
       bt.classList.remove('gravando');
       bt.querySelector('span').textContent = 'Ditar a demanda';
@@ -510,14 +562,14 @@ function ligarVoz() {
     try {
       ouvir({
         onParcial: t => {
-          ultimoDitado = t;
-          el('ditado-texto').textContent = t;
-          mostrarSugestoes(t);
+          campo.value = base + t;
+          ultimoDitado = campo.value;
+          mostrarSugestoes(campo.value);
         },
-        onFim: t => { encerra(); if (t) { ultimoDitado = t; mostrarSugestoes(t); } },
-        onErro: e => { encerra(); el('ditado-texto').textContent = recadoVoz(e); }
+        onFim: () => { encerra(); campo.focus(); },
+        onErro: e => { encerra(); mostrarMsg('reg-msg', 'erro', recadoVoz(e)); }
       });
-    } catch (e) { encerra(); el('ditado-texto').textContent = recadoVoz(); }
+    } catch (e) { encerra(); mostrarMsg('reg-msg', 'erro', recadoVoz()); }
   };
 }
 
@@ -562,7 +614,8 @@ function usarSugestao(id) {
   el('f-atividade').value = String(a.id);
   mostrarDetalhe();
   const obs = el('f-obs');
-  if (!obs.value.trim() && ultimoDitado) obs.value = ultimoDitado;
+  const ditado = el('ditado-texto') ? el('ditado-texto').value.trim() : ultimoDitado;
+  if (!obs.value.trim() && ditado) obs.value = ditado;
   el('ditado-sug').innerHTML = `<div class="msg ok" style="margin-top:10px">
     Preenchi com "${esc(a.atividade)}". Confira o tempo e salve.</div>`;
   el('f-minutos').focus();
@@ -588,6 +641,7 @@ function mostrarDetalhe() {
 }
 
 async function salvarRegistro() {
+  if (travadoNaVisao('reg-msg')) return;
   const livre = el('f-processo').value === '__livre__';
   const minutos = Number(el('f-minutos').value);
   const data = el('f-data').value;
@@ -636,7 +690,7 @@ async function salvarRegistro() {
       : 'Registro salvo.');
     el('f-obs').value = ''; el('f-atividade').value = ''; el('detalhe-atividade').innerHTML = '';
     if (el('f-livre-nome')) el('f-livre-nome').value = '';
-    renderUltimos(); atualizarAreas();
+    renderUltimos(); atualizarAreas(); atualizarSino();
   } catch (e) {
     mostrarMsg('reg-msg', 'erro', traduzErro(e));
   } finally {
@@ -812,6 +866,7 @@ function ligarQuadro() {
 }
 
 async function moverRegistro(id, novoStatus) {
+  if (travadoNaVisao('q-msg')) return;
   const r = registros.find(x => x.id === id);
   if (!r || r.status === novoStatus) return;
   const anterior = r.status;
@@ -1203,6 +1258,7 @@ function abrirFicha(a) {
 }
 
 async function salvarFicha(id) {
+  if (travadoNaVisao('ficha-msg')) return;
   pararVoz();
   const dados = {
     processo: el('fi-processo').value.trim(),
@@ -1370,6 +1426,7 @@ function renderHistorico() {
 }
 
 async function desfazer(h, botao) {
+  if (travadoNaVisao('h-msg')) return;
   botao.disabled = true;
   const rotuloOriginal = botao.textContent;
   botao.textContent = 'Desfazendo…';
@@ -1394,6 +1451,389 @@ function dataHora(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('pt-BR') + ' ' +
          d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+
+/* =====================================================================
+   10c. Tela: sugestões
+   Cada sugestão é uma conversa: a BP escreve, quem responde responde,
+   e ela pode voltar. A autora enxerga só as próprias; visão completa
+   e administrador enxergam todas.
+   ===================================================================== */
+const TIPOS_SUG = {
+  melhoria: { rotulo: 'Melhoria', cor: 't-es' },
+  erro:     { rotulo: 'Algo errado', cor: 't-sai' },
+  duvida:   { rotulo: 'Dúvida', cor: 't-neu' }
+};
+const SITUACOES_SUG = {
+  nova:       { rotulo: 'Nova', cor: 't-am' },
+  analisando: { rotulo: 'Em análise', cor: 't-op' },
+  feita:      { rotulo: 'Feita', cor: 't-es' },
+  nao_agora:  { rotulo: 'Não agora', cor: 't-neu' }
+};
+let sugestoes = [];
+let mensagens = [];
+
+function telaSugestoes(c) {
+  c.innerHTML = `
+  <div class="card">
+    <h3>Mandar uma sugestão</h3>
+    <p class="sub">Achou que falta algo, achou algo errado, ficou com dúvida? Escreva aqui.
+      Vira uma conversa: você recebe a resposta nesta mesma tela.</p>
+    <div id="s-msg"></div>
+    <div class="linha-campos lc3">
+      <div style="grid-column:span 2">
+        <label class="lab" for="s-titulo">Em uma linha, o que é</label>
+        <input type="text" id="s-titulo" placeholder="Ex.: falta um campo para o nome do gestor" maxlength="120">
+      </div>
+      <div><label class="lab" for="s-tipo">Tipo</label>
+        <select id="s-tipo">
+          <option value="melhoria">Melhoria</option>
+          <option value="erro">Algo errado</option>
+          <option value="duvida">Dúvida</option>
+        </select></div>
+    </div>
+    <div style="margin-top:14px">
+      <div class="lab-linha"><label class="lab" for="s-texto">Conte com calma</label>
+        ${botaoMic('s-texto', 'a sugestão')}</div>
+      <textarea id="s-texto" style="min-height:110px"
+        placeholder="O que você tentou fazer, o que esperava que acontecesse, e o que aconteceu"></textarea>
+    </div>
+    <div class="acoes" style="margin-top:16px">
+      <button class="bt" id="s-enviar">Enviar sugestão</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>${veTudo() ? 'Sugestões da equipe' : 'Suas sugestões'}</h3>
+    <p class="sub">${veTudo()
+      ? 'Tudo que as BPs mandaram, da conversa mexida mais recentemente para a mais antiga.'
+      : 'Clique para abrir a conversa e ver a resposta.'}</p>
+    <div id="s-lista"><div class="carregando">Carregando…</div></div>
+  </div>`;
+  el('s-enviar').onclick = enviarSugestao;
+  ligarMics(el('conteudo'), 's-msg');
+  carregarSugestoes();
+}
+
+async function carregarSugestoes(silencioso) {
+  const r1 = await sb.from('bp_sugestoes').select('*').order('mexido_em', { ascending: false }).limit(300);
+  if (r1.error) {
+    if (silencioso) { sugestoes = []; mensagens = []; return; }
+    el('s-lista').innerHTML = /bp_sugesto/i.test(r1.error.message || '')
+      ? '<div class="aviso"><span>&#9888;</span><div>Falta rodar o arquivo <b>08-sugestoes.sql</b> no Supabase para esta aba funcionar.</div></div>'
+      : `<div class="vazio">${esc(traduzErro(r1.error))}</div>`;
+    return;
+  }
+  sugestoes = r1.data || [];
+  const r2 = await sb.from('bp_sugestao_msgs').select('*').order('criado_em').limit(2000);
+  mensagens = r2.error ? [] : (r2.data || []);
+  if (silencioso) { atualizarSino(); return; }
+  renderSugestoes();
+  atualizarSino();
+}
+
+function msgsDe(id) { return mensagens.filter(m => m.sugestao_id === id); }
+
+function temRespostaNova(s) {
+  const ms = msgsDe(s.id);
+  if (!ms.length) return false;
+  return ms[ms.length - 1].autor_id !== perfil.id;
+}
+
+function renderSugestoes() {
+  if (!sugestoes.length) {
+    el('s-lista').innerHTML = '<div class="vazio">Nenhuma sugestão por aqui ainda.</div>';
+    return;
+  }
+  el('s-lista').innerHTML = `<div class="tabela-wrap"><table>
+    <thead><tr><th>Sugestão</th><th style="width:118px">Tipo</th>
+      <th style="width:122px">Situação</th><th style="width:150px">Quem mandou</th>
+      <th style="width:130px"></th></tr></thead>
+    <tbody>${sugestoes.map(s => {
+      const ms = msgsDe(s.id);
+      const nova = temRespostaNova(s);
+      return `<tr class="clicavel" tabindex="0" data-sug-abrir="${s.id}">
+        <td data-r="Sugestão"><div><div class="b-proc">${esc(s.titulo)}
+          ${nova ? '<span class="tag t-am">nova resposta</span>' : ''}</div>
+          <div class="mini">${dataHora(s.criado_em)} · ${ms.length} ${ms.length === 1 ? 'mensagem' : 'mensagens'}</div></div></td>
+        <td data-r="Tipo"><span class="tag ${(TIPOS_SUG[s.tipo] || TIPOS_SUG.melhoria).cor}">${(TIPOS_SUG[s.tipo] || TIPOS_SUG.melhoria).rotulo}</span></td>
+        <td data-r="Situação"><span class="tag ${(SITUACOES_SUG[s.status] || SITUACOES_SUG.nova).cor}">${(SITUACOES_SUG[s.status] || SITUACOES_SUG.nova).rotulo}</span></td>
+        <td data-r="Quem mandou" class="mini">${esc(nomeDe(s.autor_id))}</td>
+        <td><button class="bt sec peq" data-sug-abrir2="${s.id}">Abrir conversa</button></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+
+  document.querySelectorAll('[data-sug-abrir], [data-sug-abrir2]').forEach(e => {
+    const id = e.dataset.sugAbrir || e.dataset.sugAbrir2;
+    const abrir = ev => { ev.stopPropagation(); abrirConversa(id); };
+    e.onclick = abrir;
+    e.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrirConversa(id); } };
+  });
+}
+
+async function enviarSugestao() {
+  if (travadoNaVisao('s-msg')) return;
+  const titulo = el('s-titulo').value.trim();
+  const texto = el('s-texto').value.trim();
+  if (titulo.length < 5) return mostrarMsg('s-msg', 'erro', 'Escreva em uma linha o que é, com pelo menos 5 letras.');
+  if (texto.length < 10) return mostrarMsg('s-msg', 'erro', 'Conte um pouco mais, para dar contexto de quem vai ler.');
+
+  const botao = el('s-enviar');
+  botao.disabled = true; botao.textContent = 'Enviando…';
+  try {
+    const { data: s, error } = await sb.from('bp_sugestoes')
+      .insert({ autor_id: perfil.id, titulo, tipo: el('s-tipo').value }).select().single();
+    if (error) throw error;
+    const r = await sb.from('bp_sugestao_msgs')
+      .insert({ sugestao_id: s.id, autor_id: perfil.id, texto }).select().single();
+    if (r.error) throw r.error;
+    sugestoes.unshift(s);
+    mensagens.push(r.data);
+    el('s-titulo').value = ''; el('s-texto').value = '';
+    mostrarMsg('s-msg', 'ok', 'Sugestão enviada. A resposta aparece aqui mesmo, na conversa.');
+    renderSugestoes();
+  } catch (e) {
+    mostrarMsg('s-msg', 'erro', /bp_sugesto/i.test(e.message || '')
+      ? 'Falta rodar o arquivo 08-sugestoes.sql no Supabase.' : traduzErro(e));
+  } finally {
+    botao.disabled = false; botao.textContent = 'Enviar sugestão';
+  }
+}
+
+function abrirConversa(id) {
+  const s = sugestoes.find(x => x.id === id);
+  if (!s) return;
+  const ms = msgsDe(id);
+  const situacao = SITUACOES_SUG[s.status] || SITUACOES_SUG.nova;
+  const tipo = TIPOS_SUG[s.tipo] || TIPOS_SUG.melhoria;
+
+  abrirDlg(`
+    <h3>${esc(s.titulo)}</h3>
+    <div class="acoes" style="margin:-8px 0 14px">
+      <span class="tag ${tipo.cor}">${tipo.rotulo}</span>
+      <span class="tag ${situacao.cor}">${situacao.rotulo}</span>
+      <span class="mini">${esc(nomeDe(s.autor_id))} · ${dataHora(s.criado_em)}</span>
+    </div>
+    <div id="conversa-msg"></div>
+    ${veTudo() ? `<div style="margin-bottom:14px">
+      <label class="lab" for="cv-status">Situação</label>
+      <select id="cv-status">${Object.keys(SITUACOES_SUG).map(k =>
+        `<option value="${k}" ${s.status === k ? 'selected' : ''}>${SITUACOES_SUG[k].rotulo}</option>`).join('')}</select>
+    </div>` : ''}
+    <div class="conversa">
+      ${ms.map(m => `<div class="fala${m.autor_id === perfil.id ? ' minha' : ''}">
+        <div class="fala-topo"><b>${esc(nomeDe(m.autor_id))}</b><span>${dataHora(m.criado_em)}</span></div>
+        <div class="fala-texto">${esc(m.texto).replace(/\n/g, '<br>')}</div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:16px">
+      <div class="lab-linha"><label class="lab" for="cv-texto">Responder</label>
+        ${botaoMic('cv-texto', 'a resposta')}</div>
+      <textarea id="cv-texto" placeholder="Escreva aqui"></textarea>
+    </div>
+    <div class="rodape">
+      <button class="bt" id="cv-enviar">Enviar</button>
+      <button class="bt sec direita" id="cv-fechar">Fechar</button>
+    </div>`);
+
+  el('cv-fechar').onclick = () => { pararVoz(); el('dlg').close(); };
+  el('cv-enviar').onclick = () => responderConversa(s);
+  if (el('cv-status')) el('cv-status').onchange = async () => {
+    const novo = el('cv-status').value;
+    const { error } = await sb.from('bp_sugestoes').update({ status: novo }).eq('id', s.id);
+    if (error) return mostrarMsg('conversa-msg', 'erro', traduzErro(error));
+    s.status = novo;
+    mostrarMsg('conversa-msg', 'ok', 'Situação atualizada para ' + SITUACOES_SUG[novo].rotulo + '.');
+    renderSugestoes();
+  };
+  ligarMics(el('dlg-corpo'), 'conversa-msg');
+  const cx = document.querySelector('.conversa');
+  if (cx) cx.scrollTop = cx.scrollHeight;
+}
+
+async function responderConversa(s) {
+  if (travadoNaVisao('conversa-msg')) return;
+  const texto = el('cv-texto').value.trim();
+  if (texto.length < 2) return mostrarMsg('conversa-msg', 'erro', 'Escreva a resposta antes de enviar.');
+  const botao = el('cv-enviar');
+  botao.disabled = true; botao.textContent = 'Enviando…';
+  try {
+    pararVoz();
+    const { data, error } = await sb.from('bp_sugestao_msgs')
+      .insert({ sugestao_id: s.id, autor_id: perfil.id, texto }).select().single();
+    if (error) throw error;
+    mensagens.push(data);
+    s.mexido_em = data.criado_em;
+    el('dlg').close();
+    renderSugestoes();
+    abrirConversa(s.id);
+  } catch (e) {
+    mostrarMsg('conversa-msg', 'erro', traduzErro(e));
+  } finally {
+    botao.disabled = false; botao.textContent = 'Enviar';
+  }
+}
+
+
+/* =====================================================================
+   10d. Sininho e olho
+   Sininho: cada pessoa tem o seu. Conta o que chegou desde a última vez
+   que ela abriu (marcações com @ e respostas nas sugestões) e o que está
+   parado há tempo demais.
+   Olho: só o administrador. Mostra o sistema pelos olhos de outra pessoa,
+   sem poder gravar nada.
+   ===================================================================== */
+const DIAS_PARADO = 7;
+
+function montarSinoEOlho() {
+  el('btn-sino').hidden = false;
+  el('btn-sino').onclick = abrirSino;
+  el('btn-olho').hidden = !ehAdminDeVerdade();
+  el('btn-olho').onclick = abrirOlho;
+  atualizarSino();
+}
+
+function diasDesde(dataIso) {
+  const d = new Date(dataIso + 'T12:00:00');
+  return Math.floor((new Date(hojeIso() + 'T12:00:00') - d) / 86400000);
+}
+
+function minhasNovidades() {
+  const eu = euEfetivo();
+  const visto = perfil.visto_em ? new Date(perfil.visto_em) : new Date(0);
+
+  const marcacoes = registros
+    .filter(r => r.usuario_id !== eu && Array.isArray(r.mencionados) && r.mencionados.includes(eu))
+    .filter(r => new Date(r.criado_em) > visto);
+
+  const minhasSugestoes = sugestoes.filter(s => s.autor_id === eu || veTudo());
+  const respostas = mensagens
+    .filter(m => m.autor_id !== eu && new Date(m.criado_em) > visto)
+    .filter(m => minhasSugestoes.some(s => s.id === m.sugestao_id));
+
+  const parados = registros
+    .filter(r => r.usuario_id === eu && r.status !== 'Concluída' && diasDesde(r.data) > DIAS_PARADO)
+    .sort((a, b) => a.data.localeCompare(b.data));
+
+  return { marcacoes, respostas, parados,
+           total: marcacoes.length + respostas.length + parados.length };
+}
+
+function atualizarSino() {
+  if (!el('btn-sino') || el('btn-sino').hidden) return;
+  const n = minhasNovidades().total;
+  const selo = el('sino-num');
+  selo.hidden = n === 0;
+  selo.textContent = n > 9 ? '9+' : String(n);
+  el('btn-sino').classList.toggle('tem-novidade', n > 0);
+}
+
+async function abrirSino() {
+  const n = minhasNovidades();
+  const linha = (titulo, sub, aba) =>
+    `<button type="button" class="item-sino" data-ir="${aba}">
+      <span class="is-tit">${titulo}</span><span class="is-sub">${sub}</span></button>`;
+
+  abrirDlg(`
+    <h3>Novidades${simulando() ? ' de ' + esc(vendoComo.nome) : ''}</h3>
+    <p class="mini" style="margin:-8px 0 16px">${n.total
+      ? 'Toque em qualquer item para ir até ele.'
+      : 'Nada novo por aqui. Quando alguém te marcar ou responder, aparece nesta caixinha.'}</p>
+
+    ${n.marcacoes.length ? `<div class="grupo-sino">
+      <h4>Marcaram você</h4>
+      ${n.marcacoes.slice(0, 8).map(r => linha(
+        esc(nomeDe(r.usuario_id)) + ' te marcou',
+        esc(r.atividade) + ' · ' + dataBr(r.data), 'quadro')).join('')}
+    </div>` : ''}
+
+    ${n.respostas.length ? `<div class="grupo-sino">
+      <h4>Respostas nas suas sugestões</h4>
+      ${n.respostas.slice(0, 8).map(m => {
+        const s = sugestoes.find(x => x.id === m.sugestao_id);
+        return linha(esc(nomeDe(m.autor_id)) + ' respondeu',
+          esc(s ? s.titulo : 'sugestão'), 'sugestoes');
+      }).join('')}
+    </div>` : ''}
+
+    ${n.parados.length ? `<div class="grupo-sino">
+      <h4>Parado há mais de ${DIAS_PARADO} dias</h4>
+      ${n.parados.slice(0, 8).map(r => linha(
+        esc(r.atividade),
+        r.status + ' desde ' + dataBr(r.data) + ' · ' + diasDesde(r.data) + ' dias', 'quadro')).join('')}
+      ${n.parados.length > 8 ? `<p class="mini">e mais ${n.parados.length - 8}</p>` : ''}
+    </div>` : ''}
+
+    <div class="rodape"><button class="bt sec direita" id="sino-fechar">Fechar</button></div>`);
+
+  el('sino-fechar').onclick = () => el('dlg').close();
+  document.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => {
+    const destino = b.dataset.ir;
+    el('dlg').close();
+    ir(destino);
+  });
+
+  // Abrir o sininho conta como "vi". As pendências antigas continuam
+  // aparecendo, porque elas só saem quando a atividade for concluída.
+  if (!simulando() && (n.marcacoes.length || n.respostas.length)) {
+    try {
+      const { data } = await sb.rpc('bp_marcar_visto');
+      if (data) perfil.visto_em = data;
+    } catch (e) { /* sem o arquivo 09 o sininho só não marca como visto */ }
+    atualizarSino();
+  }
+}
+
+/* ------------------------------------------------------------ o olho */
+function abrirOlho() {
+  const gente = perfis.filter(u => u.ativo).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  abrirDlg(`
+    <h3>Ver o sistema como outra pessoa</h3>
+    <p class="mini" style="margin:-8px 0 14px">Serve para conferir o que cada nível enxerga.
+      A visão é só de leitura: nada é gravado enquanto você estiver nela.</p>
+    <div class="lista-olho">
+      ${gente.map(u => `<button type="button" class="item-olho" data-ver="${u.id}">
+        <span class="av">${iniciais(u.nome)}</span>
+        <span><b>${esc(u.nome)}</b><span class="mini">${esc(papelDe(u.papel).rotulo)} · ${esc(u.cargo)}</span></span>
+      </button>`).join('')}
+    </div>
+    <div class="rodape">
+      ${simulando() ? '<button class="bt" id="olho-sair">Voltar a ser eu</button>' : ''}
+      <button class="bt sec direita" id="olho-fechar">Fechar</button>
+    </div>`);
+  el('olho-fechar').onclick = () => el('dlg').close();
+  if (el('olho-sair')) el('olho-sair').onclick = () => { el('dlg').close(); sairDaVisao(); };
+  document.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => {
+    const u = perfis.find(x => x.id === b.dataset.ver);
+    el('dlg').close();
+    entrarNaVisao(u);
+  });
+}
+
+function entrarNaVisao(u) {
+  if (!u || u.id === perfil.id) { sairDaVisao(); return; }
+  vendoComo = { id: u.id, nome: u.nome, papel: u.papel };
+  pintarFaixaVisao();
+  montarAbas();
+  ir('registrar');
+}
+
+function sairDaVisao() {
+  vendoComo = null;
+  pintarFaixaVisao();
+  montarAbas();
+  ir('registrar');
+}
+
+function pintarFaixaVisao() {
+  const f = el('faixa-visao');
+  if (!simulando()) { f.hidden = true; f.innerHTML = ''; atualizarSino(); return; }
+  f.hidden = false;
+  f.innerHTML = `<span>Você está vendo como <b>${esc(vendoComo.nome)}</b>,
+    no nível ${esc(papelDe(vendoComo.papel).rotulo)}. Só leitura.</span>
+    <button type="button" class="bt peq" id="faixa-sair">Voltar a ser eu</button>`;
+  el('faixa-sair').onclick = sairDaVisao;
+  atualizarSino();
 }
 
 /* =====================================================================
