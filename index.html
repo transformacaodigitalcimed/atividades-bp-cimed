@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atividades BP · CIMED</title>
+<meta name="description" content="Acompanhamento da rotina das Business Partners de Pouso Alegre: registro diário, painel de indicadores e catálogo de atividades.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23FBC400'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Ao alterar style.css ou app.js, some 1 no ?v= das duas linhas.
+     Isso força o navegador a buscar a versão nova em vez da guardada em cache. -->
+<link rel="stylesheet" href="style.css?v=6">
+</head>
+<body>
+
+<!-- ============================================================ LOGIN -->
+<div id="tela-login">
+  <div class="cx-login">
+    <div class="faixa"></div>
+    <div class="corpo">
+      <div class="marca">
+        <span class="capsula" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13.5 3.6a5.1 5.1 0 0 1 7.2 7.2l-8.1 8.1a5.1 5.1 0 1 1-7.2-7.2l8.1-8.1Z" fill="#14130d"/><path d="M9.2 7.9l7.2 7.2" stroke="#FBC400" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <span class="selo">CIMED</span>
+      </div>
+      <h1 class="d" id="login-titulo">Atividades BP</h1>
+      <p class="s" id="login-sub">Pouso Alegre · acompanhamento da rotina dos Business Partners</p>
+
+      <div id="login-msg"></div>
+
+      <form id="form-login" autocomplete="on">
+        <div id="campo-nome" hidden>
+          <label class="lab" for="login-nome">Seu nome</label>
+          <input id="login-nome" type="text" placeholder="Nome e sobrenome" autocomplete="name">
+        </div>
+
+        <label class="lab" for="login-email" style="margin-top:0">E-mail corporativo</label>
+        <input id="login-email" type="email" required autocomplete="username" placeholder="nome@grupocimed.com.br">
+
+        <label class="lab" for="login-senha">Senha</label>
+        <input id="login-senha" type="password" required autocomplete="current-password" placeholder="••••••••" minlength="6">
+
+        <button type="submit" class="bt" id="btn-entrar" style="width:100%; margin-top:20px">Entrar</button>
+      </form>
+
+      <div class="alternar">
+        <span id="alternar-texto">Primeira vez aqui?</span>
+        <button type="button" id="btn-alternar">Criar meu acesso</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================== APP -->
+<div id="app" hidden>
+  <header id="topo">
+    <div class="topo-in">
+      <span class="capsula" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13.5 3.6a5.1 5.1 0 0 1 7.2 7.2l-8.1 8.1a5.1 5.1 0 1 1-7.2-7.2l8.1-8.1Z" fill="#14130d"/><path d="M9.2 7.9l7.2 7.2" stroke="#FBC400" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+      <span class="selo">CIMED</span>
+      <span class="tit"><b>Atividades BP</b><span id="topo-sub">Pouso Alegre</span></span>
+      <div class="topo-dir">
+        <span class="chip-user"><span class="av" id="avatar">·</span><span id="nome-usuario">·</span></span>
+        <button class="bt-ico" id="btn-tema" title="Alternar tema claro e escuro" aria-label="Alternar tema claro e escuro">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        </button>
+        <button class="bt-ico" id="btn-sair" title="Sair" aria-label="Sair">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="abas" id="abas" role="tablist"></nav>
+  </header>
+  <main id="conteudo"><div class="carregando">Carregando seus dados…</div></main>
+</div>
+
+<div id="tip" role="status"></div>
+<dialog id="dlg"><div class="dlg-corpo" id="dlg-corpo"></div></dialog>
+
+<script type="module" src="app.js?v=6"></script>
+</body>
+</html>
