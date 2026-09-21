@@ -5,7 +5,7 @@
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=10';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=13';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -211,7 +211,7 @@ function montarAbas() {
     ['quadro', 'Quadro'],
     ['meus', 'Meus registros'],
     ['painel', 'Painel'],
-    ['catalogo', 'Catálogo de atividades'],
+    ['catalogo', 'Catálogo'],
     ['historico', 'Histórico'],
     ['sugestoes', 'Sugestões']
   ];
@@ -219,10 +219,30 @@ function montarAbas() {
   el('abas').innerHTML = lista.map(([k, r]) =>
     `<button class="aba" role="tab" data-aba="${k}" aria-selected="${k === aba}">${r}</button>`).join('');
   el('abas').querySelectorAll('.aba').forEach(b => b.onclick = () => ir(b.dataset.aba));
+  ligarRolagemAbas();
+}
+
+/* A faixa de abas rola para o lado. Sem uma pista visual, quem olha pensa
+   que ela acabou na última aba visível. As sombras nas pontas resolvem. */
+function ligarRolagemAbas() {
+  const faixa = el('abas'), caixa = el('abas-wrap');
+  if (!faixa || !caixa) return;
+  const avaliar = () => {
+    const sobra = faixa.scrollWidth - faixa.clientWidth;
+    caixa.classList.toggle('tem-mais-dir', sobra > 4 && faixa.scrollLeft < sobra - 4);
+    caixa.classList.toggle('tem-mais-esq', faixa.scrollLeft > 4);
+  };
+  faixa.onscroll = avaliar;
+  window.addEventListener('resize', avaliar);
+  avaliar();
 }
 function ir(nova) {
   aba = nova;
-  el('abas').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', b.dataset.aba === aba));
+  el('abas').querySelectorAll('.aba').forEach(b => {
+    const ativa = b.dataset.aba === aba;
+    b.setAttribute('aria-selected', ativa);
+    if (ativa && b.scrollIntoView) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  });
   const c = el('conteudo');
   window.scrollTo({ top: 0, behavior: 'instant' });
   if (aba === 'registrar') telaRegistrar(c);
@@ -2083,7 +2103,9 @@ function emailHtml(c) {
       <p style="margin:0 0 22px;font-size:13px;color:#8b877b;line-height:1.6">
         Se o botão não abrir, copie este endereço no navegador:<br>
         <span style="color:#7a5600">${esc(CONFIG.urlSite)}</span><br>
-        Abra também no celular e adicione na tela inicial: é lá que o áudio ajuda mais.</p>
+        No celular, vale deixar na tela inicial: fica com cara de aplicativo e é lá
+        que o áudio ajuda mais. O passo a passo está aqui:<br>
+        <a href="${esc(CONFIG.urlGuiaCelular)}" style="color:#7a5600">${esc(CONFIG.urlGuiaCelular)}</a></p>
 
       <p style="margin:0 0 14px;font-size:15px;color:#16150f;line-height:1.6">
         <b>Minha sugestão de uso:</b> lance ao longo do dia, não no fim do mês.
@@ -2125,7 +2147,7 @@ PARA ENTRAR
 2. Clique em "Criar meu acesso"
 3. Use o e-mail ${c.email} e escolha uma senha sua, de no mínimo 6 caracteres
 
-Abra também no celular e adicione na tela inicial: é lá que o áudio ajuda mais.
+No celular, vale deixar na tela inicial: fica com cara de aplicativo e é lá que o áudio ajuda mais. O passo a passo está aqui: ${CONFIG.urlGuiaCelular}
 
 MINHA SUGESTÃO DE USO
 Lance ao longo do dia, não no fim do mês. São menos de 30 segundos por atividade, e com o áudio dá para fazer no corredor. Em duas semanas você já tem o seu próprio retrato de onde o tempo está indo.

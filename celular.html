@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ritmo no celular · CIMED</title>
+<meta name="description" content="Como deixar o Ritmo na tela inicial do celular, com cara de aplicativo, e como usar o registro por voz.">
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="theme-color" content="#FBC400">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light;
+  --am:#FBC400; --am-fundo:#FFF3CC; --am-tinta:#7a5600;
+  --bg:#f5f4ef; --sup:#fff; --sup2:#faf9f4; --linha:#e5e2d8; --linha-forte:#d3cfc1;
+  --txt:#16150f; --txt2:#56534a; --txt3:#8b877b;
+  --ff-d:"Outfit","Segoe UI",system-ui,sans-serif;
+  --ff-t:"Public Sans","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --am-fundo:#3a2f07; --am-tinta:#ffd94d;
+    --bg:#131210; --sup:#1c1b18; --sup2:#232219; --linha:#33312a; --linha-forte:#474437;
+    --txt:#f8f7f2; --txt2:#c5c2b6; --txt3:#928e81;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg); color:var(--txt);
+  font-family:var(--ff-t); font-size:16px; line-height:1.6}
+h1,h2,h3{font-family:var(--ff-d); letter-spacing:-.01em}
+img{max-width:100%}
+
+header{background:var(--sup); border-top:5px solid var(--am);
+  border-bottom:1px solid var(--linha); padding:16px 20px}
+.cab{max-width:760px; margin:0 auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+.selo{background:var(--am); color:#14130d; font-family:var(--ff-d); font-weight:800;
+  font-size:18px; letter-spacing:.04em; padding:3px 14px; border-radius:999px}
+.cab b{font-family:var(--ff-d); font-size:18px}
+
+main{max-width:760px; margin:0 auto; padding:24px 20px 70px}
+.abertura{margin-bottom:26px}
+.abertura h1{font-size:26px; margin:0 0 8px}
+.abertura p{margin:0; color:var(--txt2); font-size:16.5px}
+
+.card{background:var(--sup); border:1px solid var(--linha); border-radius:14px;
+  padding:22px; margin-bottom:18px;
+  box-shadow:0 1px 2px rgba(20,18,10,.06), 0 8px 24px rgba(20,18,10,.05)}
+.card > h2{font-size:19px; margin:0 0 4px; display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.card > p.s{margin:0 0 18px; color:var(--txt3); font-size:14.5px}
+
+ol.passos{counter-reset:p; list-style:none; padding:0; margin:0}
+ol.passos li{counter-increment:p; position:relative; padding:0 0 18px 44px}
+ol.passos li:last-child{padding-bottom:0}
+ol.passos li::before{content:counter(p); position:absolute; left:0; top:-1px;
+  width:30px; height:30px; background:var(--am); color:#14130d; border-radius:999px;
+  display:grid; place-items:center; font-family:var(--ff-d); font-weight:700; font-size:15px}
+ol.passos b{font-weight:700}
+ol.passos .obs{display:block; color:var(--txt3); font-size:14px; margin-top:3px}
+
+.mostra-icone{display:flex; flex-direction:column; align-items:center; gap:5px;
+  width:80px; margin:10px 0 0; text-align:center}
+.mostra-icone img{width:58px; height:58px; border-radius:14px; display:block;
+  box-shadow:0 3px 10px rgba(20,18,10,.22)}
+.mostra-icone b{font-family:var(--ff-d); font-size:12.5px; font-weight:600; color:var(--txt2)}
+.chip{display:inline-block; background:var(--sup2); border:1px solid var(--linha-forte);
+  border-radius:7px; padding:1px 8px; font-family:var(--ff-d); font-weight:600;
+  font-size:14px; white-space:nowrap}
+.tres-pontos{font-family:var(--ff-d); font-weight:800; letter-spacing:2px}
+
+.aviso{display:flex; gap:12px; background:var(--am-fundo);
+  border:1px solid rgba(251,196,0,.5); color:var(--am-tinta);
+  border-radius:11px; padding:14px 16px; font-size:14.5px; margin-top:18px}
+.aviso b{font-family:var(--ff-d)}
+
+.lista-uso{display:grid; gap:14px; margin:0; padding:0; list-style:none}
+.lista-uso li{background:var(--sup2); border:1px solid var(--linha);
+  border-left:3px solid var(--am); border-radius:11px; padding:13px 16px}
+.lista-uso b{display:block; font-family:var(--ff-d); font-size:15.5px; margin-bottom:2px}
+.lista-uso span{font-size:14.5px; color:var(--txt2)}
+
+.endereco{display:block; background:var(--sup2); border:1px solid var(--linha-forte);
+  border-radius:10px; padding:13px 15px; margin:14px 0 0;
+  font-family:ui-monospace, Consolas, monospace; font-size:14px;
+  word-break:break-all; color:var(--am-tinta); text-decoration:none}
+.endereco:hover{border-color:var(--am)}
+
+.fim{text-align:center; color:var(--txt3); font-size:14px; margin-top:34px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="cab">
+    <span class="selo">CIMED</span>
+    <b>Ritmo no celular</b>
+  </div>
+</header>
+
+<main>
+  <div class="abertura">
+    <h1>Deixe o Ritmo na tela inicial</h1>
+    <p>Dá para colocar o Ritmo na tela do celular como se fosse um aplicativo: abre
+      em um toque, sem barra de endereço, sem precisar procurar o link no WhatsApp.
+      São dois minutos, e é diferente no Android e no iPhone.</p>
+  </div>
+
+  <div class="card">
+    <h2>O endereço do sistema</h2>
+    <p class="s">É sempre o mesmo, guarde este.</p>
+    <a class="endereco" href="https://transformacaodigitalcimed.github.io/atividades-bp-cimed/">https://transformacaodigitalcimed.github.io/atividades-bp-cimed/</a>
+  </div>
+
+  <div class="card">
+    <h2>📱 No Android <span class="chip">pelo Chrome</span></h2>
+    <p class="s">Se o seu celular não é iPhone, é por aqui.</p>
+    <ol class="passos">
+      <li><b>Abra o endereço no Chrome.</b>
+        <span class="obs">Se abrir em outro navegador, copie o endereço e cole no Chrome.</span></li>
+      <li><b>Toque nos três pontinhos</b> <span class="tres-pontos">⋮</span> no canto superior direito.</li>
+      <li>Toque em <span class="chip">Adicionar à tela inicial</span>
+        <span class="obs">Em alguns celulares aparece como "Instalar aplicativo" ou "Instalar app". É a mesma coisa.</span></li>
+      <li><b>Confirme em Adicionar</b> ou Instalar.
+        <span class="obs">Pode aparecer um segundo aviso pedindo confirmação. É só tocar em adicionar de novo.</span></li>
+      <li><b>Pronto.</b> O ícone aparece na sua tela inicial assim:
+        <span class="mostra-icone"><img src="icone-192.png" alt="Ícone do Ritmo"><b>Ritmo</b></span></li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>🍎 No iPhone <span class="chip">pelo Safari</span></h2>
+    <p class="s">No iPhone isso só funciona pelo Safari, não pelo Chrome.</p>
+    <ol class="passos">
+      <li><b>Abra o endereço no Safari.</b>
+        <span class="obs">É o navegador com o ícone de bússola azul. Se você abrir no Chrome, o passo do compartilhar não oferece a opção.</span></li>
+      <li><b>Toque no ícone de compartilhar</b>, o quadradinho com a flecha para cima.
+        <span class="obs">Fica na barra de baixo, no meio. Em iPhones antigos fica na barra de cima.</span></li>
+      <li><b>Arraste a lista para cima</b> e toque em <span class="chip">Adicionar à Tela de Início</span></li>
+      <li><b>Toque em Adicionar</b>, no canto superior direito.</li>
+      <li><b>Pronto.</b> O ícone aparece na sua tela inicial assim:
+        <span class="mostra-icone"><img src="icone-192.png" alt="Ícone do Ritmo"><b>Ritmo</b></span></li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>🎤 Deixe o microfone liberado</h2>
+    <p class="s">É o que faz o registro ser rápido: você fala e o sistema escreve.</p>
+    <ol class="passos">
+      <li><b>Abra o Ritmo e vá em Registrar.</b></li>
+      <li>Toque no botão amarelo <span class="chip">Ditar a demanda</span></li>
+      <li>Quando o celular perguntar se o site pode usar o microfone, toque em
+        <b>Permitir</b>.
+        <span class="obs">Ele pergunta uma vez só. Se você tocar em bloquear sem querer, é só tocar no cadeado ao lado do endereço e liberar o microfone.</span></li>
+      <li><b>Fale normalmente</b> o que você fez. O texto aparece na tela e o sistema
+        procura a atividade no catálogo.
+        <span class="obs">O texto é editável: dá para corrigir, apagar e completar com o teclado.</span></li>
+    </ol>
+    <div class="aviso">
+      <span>💡</span>
+      <div><b>Uma dica:</b> o ditado funciona melhor em frases curtas e com o nome do
+        processo. Em vez de "conversei com uma pessoa", tente "entrevista de desligamento
+        na produção". Assim o sistema acha a atividade certa de primeira.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>O que dá para fazer pelo celular</h2>
+    <p class="s">Tudo, sem exceção. O sistema foi montado pensando na tela pequena.</p>
+    <ul class="lista-uso">
+      <li><b>Registrar por voz</b><span>Saindo da área, entre uma conversa e outra, sem guardar tudo na cabeça para lançar depois.</span></li>
+      <li><b>Mexer no quadro</b><span>Arrastar não funciona bem em tela de toque, então cada cartão tem botões com o nome das outras colunas. Um toque e ele muda de situação.</span></li>
+      <li><b>Ver o sininho</b><span>Quando alguém te marcar com @ ou responder uma sugestão sua, aparece um número vermelho no topo.</span></li>
+      <li><b>Acompanhar seu painel</b><span>Quanto do seu tempo foi estratégico, quais processos consumiram mais horas, quais áreas você mais atendeu.</span></li>
+      <li><b>Mandar sugestão</b><span>Achou que falta algo? Escreva, ou dite, na aba Sugestões. Vira uma conversa e a resposta chega ali mesmo.</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Se algo parecer estranho</h2>
+    <ol class="passos">
+      <li><b>Recarregue forçado.</b>
+        <span class="obs">No Android, puxe a tela para baixo até aparecer a setinha. No iPhone, toque e segure o botão de recarregar e escolha "Recarregar sem conteúdo".</span></li>
+      <li><b>Confira se está logada.</b>
+        <span class="obs">Se aparecer a tela de entrada, é só entrar de novo com seu e-mail e senha.</span></li>
+      <li><b>Não lembra a senha?</b>
+        <span class="obs">Fale com a Josianny. Ninguém tem acesso à sua senha, mas dá para liberar um acesso novo.</span></li>
+    </ol>
+  </div>
+
+  <p class="fim">Recursos Humanos · Cimed</p>
+</main>
+
+</body>
+</html>

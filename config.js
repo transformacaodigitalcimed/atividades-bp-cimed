@@ -34,6 +34,8 @@ export const CONFIG = {
   // Endereço do sistema no ar. Entra no e-mail de convite que a tela de
   // Gestão monta. Se mudar o nome do repositório, atualize aqui.
   urlSite: 'https://transformacaodigitalcimed.github.io/atividades-bp-cimed/',
+  // Guia de como deixar na tela inicial do celular. Vai no e-mail de convite.
+  urlGuiaCelular: 'https://transformacaodigitalcimed.github.io/atividades-bp-cimed/celular.html',
   // Assinatura do e-mail de convite. Troque aqui se quiser outro nome.
   assinatura: 'Recursos Humanos · Cimed',
   // Domínio aceito no cadastro. A trava de verdade está no banco
