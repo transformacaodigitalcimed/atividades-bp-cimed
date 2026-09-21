@@ -1,6 +1,6 @@
 /* =====================================================================
-   CIMED · Atividades BP · Pouso Alegre
-   Identidade: amarelo #FBC400 + preto, selo em cápsula, faixa no topo.
+   CIMED · Ritmo · BPs de Pouso Alegre
+   Identidade: amarelo #FBC400 + preto, selo CIMED, faixa no topo.
    ===================================================================== */
 
 :root{
@@ -55,8 +55,6 @@ img{max-width:100%}
   border-top:5px solid var(--amarelo); border-bottom:1px solid var(--linha)}
 .topo-in{display:flex; align-items:center; gap:14px; flex-wrap:wrap;
   padding:14px 22px; max-width:1280px; margin:0 auto}
-.capsula{width:34px;height:34px;border-radius:999px;background:var(--amarelo);
-  display:grid;place-items:center;flex:0 0 auto;box-shadow:0 2px 6px rgba(200,155,0,.35)}
 .selo{background:var(--amarelo); color:#14130d; font-family:var(--ff-d); font-weight:800;
   font-size:19px; letter-spacing:.04em; padding:3px 15px; border-radius:999px; line-height:1.25}
 .tit{display:flex; flex-direction:column; min-width:0}

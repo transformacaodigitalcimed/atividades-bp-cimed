@@ -3,15 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Atividades BP · CIMED</title>
-<meta name="description" content="Acompanhamento da rotina das Business Partners de Pouso Alegre: registro diário, painel de indicadores e catálogo de atividades.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23FBC400'/%3E%3C/svg%3E">
+<title>Ritmo · CIMED</title>
+<meta name="description" content="Ritmo, Rotina e Ritual: o sistema das Business Partners de Pouso Alegre para registrar a rotina, enxergar onde vai o tempo e organizar as entregas.">
+<!-- Favicon: logotipo oficial da Cimed, wordmark preto sobre o amarelo #FBC400, em SVG vetorial. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23FBC400'/%3E%3Cg transform='translate(9 40) scale(0.164)'%3E%3Cpath fill='%2314130d' d='M255.84 0.36043 222.652 54.5934 189.458 0.36043 161.133 0.36043 161.133 116.64 191.158 116.64 191.158 52.7834 215.758 95.2104 229.539 95.2104 254.139 52.7834 254.139 116.64 284.164 116.64 284.164 0.36043ZM439.92 0.41853 393.395 0.41853 393.395 116.639 439.92 116.639C475.901 116.639 499.995 93.3975 499.995 58.3625 499.995 23.6625 475.895 0.41553 439.92 0.41553ZM439.751 89.4135 424.02 89.4135 424.02 27.6465 439.751 27.6465C457.989 27.6465 468.701 39.0995 468.701 58.3595 468.701 77.9545 457.989 89.4135 439.751 89.4135ZM331.901 71.2885 371.226 71.2885 371.226 44.7235 331.901 44.7235 331.901 27.4545 374.576 27.4545 374.576 0.39353 301.445 0.39353 301.445 116.614 376.083 116.614 376.083 89.3855 331.902 89.3855ZM143.851 0.41853 113.226 0.41853 113.226 116.639 143.851 116.639ZM-0.0086 58.6305C-0.0086 93.2625 24.0414 116.46 59.9474 116.46L95.8914 116.46 95.8914 89.2875 60.1154 89.2815C41.9094 89.2815 31.2214 77.8475 31.2214 58.6245 31.2214 39.0735 41.9094 27.6385 60.1154 27.6385L95.8914 27.6501 95.8914 0.47213 59.9474 0.47213C24.0414 0.47237-0.0086 23.6701-0.0086 58.6311Z'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Ao alterar style.css ou app.js, some 1 no ?v= das duas linhas.
      Isso força o navegador a buscar a versão nova em vez da guardada em cache. -->
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -21,11 +22,10 @@
     <div class="faixa"></div>
     <div class="corpo">
       <div class="marca">
-        <span class="capsula" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13.5 3.6a5.1 5.1 0 0 1 7.2 7.2l-8.1 8.1a5.1 5.1 0 1 1-7.2-7.2l8.1-8.1Z" fill="#14130d"/><path d="M9.2 7.9l7.2 7.2" stroke="#FBC400" stroke-width="1.8" stroke-linecap="round"/></svg></span>
-        <span class="selo">CIMED</span>
+              <span class="selo">CIMED</span>
       </div>
-      <h1 class="d" id="login-titulo">Atividades BP</h1>
-      <p class="s" id="login-sub">Pouso Alegre · acompanhamento da rotina dos Business Partners</p>
+      <h1 class="d" id="login-titulo">Ritmo</h1>
+      <p class="s" id="login-sub">Ritmo, Rotina e Ritual · BPs de Pouso Alegre</p>
 
       <div id="login-msg"></div>
 
@@ -56,9 +56,8 @@
 <div id="app" hidden>
   <header id="topo">
     <div class="topo-in">
-      <span class="capsula" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13.5 3.6a5.1 5.1 0 0 1 7.2 7.2l-8.1 8.1a5.1 5.1 0 1 1-7.2-7.2l8.1-8.1Z" fill="#14130d"/><path d="M9.2 7.9l7.2 7.2" stroke="#FBC400" stroke-width="1.8" stroke-linecap="round"/></svg></span>
-      <span class="selo">CIMED</span>
-      <span class="tit"><b>Atividades BP</b><span id="topo-sub">Pouso Alegre</span></span>
+            <span class="selo">CIMED</span>
+      <span class="tit"><b>Ritmo</b><span id="topo-sub">Ritmo, Rotina e Ritual · BPs Pouso Alegre</span></span>
       <div class="topo-dir">
         <span class="chip-user"><span class="av" id="avatar">·</span><span id="nome-usuario">·</span></span>
         <button class="bt-ico" id="btn-tema" title="Alternar tema claro e escuro" aria-label="Alternar tema claro e escuro">
@@ -77,6 +76,6 @@
 <div id="tip" role="status"></div>
 <dialog id="dlg"><div class="dlg-corpo" id="dlg-corpo"></div></dialog>
 
-<script type="module" src="app.js?v=7"></script>
+<script type="module" src="app.js?v=8"></script>
 </body>
 </html>

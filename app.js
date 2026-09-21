@@ -1,11 +1,11 @@
 // =====================================================================
-// CIMED · Atividades BP · Pouso Alegre
+// CIMED · Ritmo · BPs de Pouso Alegre
 // Site estático (GitHub Pages) + banco e login no Supabase.
 // Toda a proteção dos dados está na RLS do banco, não aqui.
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=7';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=8';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -67,10 +67,10 @@ function alternarModo() {
   modoCadastro = !modoCadastro;
   el('campo-nome').hidden = !modoCadastro;
   el('login-nome').required = modoCadastro;
-  el('login-titulo').textContent = modoCadastro ? 'Criar meu acesso' : 'Atividades BP';
+  el('login-titulo').textContent = modoCadastro ? 'Criar meu acesso' : 'Ritmo';
   el('login-sub').textContent = modoCadastro
     ? 'Use seu e-mail corporativo. Só ' + CONFIG.dominio + ' é aceito.'
-    : 'Pouso Alegre · acompanhamento da rotina dos Business Partners';
+    : 'Ritmo, Rotina e Ritual · BPs de Pouso Alegre';
   el('btn-entrar').textContent = modoCadastro ? 'Criar acesso' : 'Entrar';
   el('login-senha').autocomplete = modoCadastro ? 'new-password' : 'current-password';
   el('alternar-texto').textContent = modoCadastro ? 'Já tem acesso?' : 'Primeira vez aqui?';
@@ -149,7 +149,7 @@ async function abrirApp() {
     }
     el('avatar').textContent = iniciais(perfil.nome);
     el('nome-usuario').textContent = perfil.nome.split(' ')[0] + (perfil.papel === 'admin' ? ' · Admin' : '');
-    el('topo-sub').textContent = perfil.unidade + (perfil.papel === 'admin' ? ' · Administrador' : ' · ' + perfil.cargo);
+    el('topo-sub').textContent = 'Ritmo, Rotina e Ritual · BPs ' + perfil.unidade;
     await Promise.all([carregarCatalogo(), carregarRegistros(), carregarPerfis()]);
     montarAbas();
     ir('registrar');
@@ -1377,7 +1377,29 @@ async function convidar() {
   }
 }
 
-const ASSUNTO_CONVITE = 'Seu acesso ao sistema Atividades BP';
+const ASSUNTO_CONVITE = 'Ritmo: seu acesso, e o que ele resolve pra você';
+
+/* Os cinco ganhos que o e-mail promete. Mexer aqui muda o e-mail inteiro,
+   tanto a versão em HTML quanto a em texto puro. */
+const GANHOS = [
+  ['Seu planner da semana',
+   'Um quadro com Pendente, Em andamento e Concluída. Você arrasta o cartão e pronto. ' +
+   'Serve para chegar na segunda e saber na hora o que ficou em aberto.'],
+  ['Registro por áudio',
+   'Saindo da área, entre uma conversa e outra, você toca em "Ditar a demanda" e fala. ' +
+   'O sistema entende, procura a atividade no catálogo e preenche os campos. ' +
+   'Nada de guardar tudo na cabeça para lançar no fim do dia.'],
+  ['Onde está a sua energia',
+   'O painel mostra quanto do seu tempo foi estratégico, quanto foi operacional, ' +
+   'quais processos consumiram mais horas e quais áreas você mais atendeu. ' +
+   'É o seu argumento pronto quando a conversa for sobre prioridade, escopo e time.'],
+  ['Marcar a colega no tema',
+   'Escrevendo @ e o nome dela nas observações, ela passa a ver aquele registro. ' +
+   'Bom para assunto que atravessa mais de uma BP e não pode morrer no WhatsApp.'],
+  ['O catálogo é de vocês',
+   'São as 152 atividades já mapeadas. Clicando na linha você edita a descrição, ' +
+   'o nível, o que estiver diferente da sua realidade. Quem faz o trabalho é quem descreve melhor.']
+];
 
 /* E-mail em HTML com tabelas e estilo inline, que é o que o Outlook
    entende. O selo CIMED é feito em HTML puro de propósito: imagem em
@@ -1398,18 +1420,50 @@ function emailHtml(c) {
       </tr></table>
     </td></tr>
     <tr><td style="padding:18px 30px 0">
-      <h1 style="margin:0 0 6px;font-size:22px;color:#16150f">Atividades BP</h1>
-      <p style="margin:0 0 20px;font-size:14px;color:#8b877b">Pouso Alegre</p>
-      <p style="margin:0 0 14px;font-size:15px;color:#16150f;line-height:1.55">Oi, ${primeiro}!</p>
-      <p style="margin:0 0 14px;font-size:15px;color:#16150f;line-height:1.55">
-        Seu acesso ao sistema de acompanhamento das atividades das BPs já está liberado.
-        É nele que a gente registra a rotina do dia a dia e enxerga, em números,
-        quanto do nosso tempo está em atividade estratégica.</p>
-      <p style="margin:0 0 6px;font-size:15px;color:#16150f;line-height:1.55"><b>Como entrar:</b></p>
+      <h1 style="margin:0 0 6px;font-size:22px;color:#16150f">Ritmo</h1>
+      <p style="margin:0 0 22px;font-size:14px;color:#8b877b">Ritmo, Rotina e Ritual · BPs Pouso Alegre</p>
+
+      <p style="margin:0 0 14px;font-size:15px;color:#16150f;line-height:1.6">Oi, ${primeiro}!</p>
+      <p style="margin:0 0 14px;font-size:15px;color:#16150f;line-height:1.6">
+        Seu acesso está liberado. Esse sistema existe para facilitar a rotina das BPs,
+        então, em vez de um manual, deixa eu te contar direto o que ele resolve.</p>
+      <p style="margin:0 0 14px;font-size:15px;color:#16150f;line-height:1.6">
+        Estão mapeadas <b>152 atividades</b> da rotina das BPs, cada uma classificada entre
+        operacional, tática e estratégica. O que faltava era enxergar, em número, para onde
+        o tempo vai de verdade. É isso que ele mede, e ele é seu.</p>
+      <p style="margin:0 0 22px;font-size:15px;color:#16150f;line-height:1.6">
+        O nome não foi por acaso: <b>Ritmo, Rotina e Ritual</b> é o nosso valor sobre
+        planejamento e disciplina. É disso que se trata aqui.</p>
+
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-        style="margin:0 0 22px;font-size:15px;color:#16150f;line-height:1.55">
+        style="margin:0 0 6px"><tr><td
+        style="border-left:3px solid #FBC400;padding:0 0 0 12px;font-size:15px;
+        font-weight:bold;color:#16150f">O que muda no seu dia a dia</td></tr></table>
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+        style="margin:14px 0 22px">
+        ${GANHOS.map(([t, d]) => `<tr>
+          <td valign="top" width="22" style="padding:0 0 16px;font-size:15px;color:#FBC400;
+            font-weight:bold;line-height:1.6">&bull;</td>
+          <td style="padding:0 0 16px;font-size:15px;color:#16150f;line-height:1.6">
+            <b>${esc(t)}</b><br><span style="color:#56534a">${esc(d)}</span></td>
+        </tr>`).join('')}
+      </table>
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+        style="margin:0 0 24px;background:#FFF3CC;border-radius:10px">
+        <tr><td style="padding:14px 16px;font-size:14px;color:#7a5600;line-height:1.6">
+          <b>É um espaço seu:</b> você vê e edita apenas os seus próprios lançamentos.
+          O registro de uma não aparece para a outra, a não ser quando é marcada nele.
+          E a senha é sua, ninguém mais tem acesso a ela.
+        </td></tr>
+      </table>
+
+      <p style="margin:0 0 8px;font-size:15px;color:#16150f;line-height:1.6"><b>Para entrar:</b></p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+        style="margin:0 0 22px;font-size:15px;color:#16150f;line-height:1.6">
         <tr><td width="26" valign="top" style="padding:3px 0">1.</td>
-            <td style="padding:3px 0">Abra o endereço abaixo</td></tr>
+            <td style="padding:3px 0">Abra o botão abaixo</td></tr>
         <tr><td width="26" valign="top" style="padding:3px 0">2.</td>
             <td style="padding:3px 0">Clique em <b>Criar meu acesso</b></td></tr>
         <tr><td width="26" valign="top" style="padding:3px 0">3.</td>
@@ -1418,18 +1472,22 @@ function emailHtml(c) {
       </table>
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px">
         <tr><td style="background:#FBC400;border-radius:10px">
-          <a href="${esc(CONFIG.urlSite)}" style="display:inline-block;padding:13px 26px;
+          <a href="${esc(CONFIG.urlSite)}" style="display:inline-block;padding:14px 28px;
             font-family:Segoe UI,Arial,sans-serif;font-weight:bold;font-size:15px;
-            color:#14130d;text-decoration:none">Abrir o sistema</a>
+            color:#14130d;text-decoration:none">Abrir o Ritmo</a>
         </td></tr>
       </table>
-      <p style="margin:0 0 20px;font-size:13px;color:#8b877b;line-height:1.55">
+      <p style="margin:0 0 22px;font-size:13px;color:#8b877b;line-height:1.6">
         Se o botão não abrir, copie este endereço no navegador:<br>
-        <span style="color:#7a5600">${esc(CONFIG.urlSite)}</span></p>
-      <p style="margin:0 0 6px;font-size:15px;color:#16150f;line-height:1.55">
-        No primeiro acesso vale dar uma olhada no <b>Catálogo</b>: são as 152 atividades
-        que a gente mapeou, e você pode ajustar o que estiver diferente da sua realidade.</p>
-      <p style="margin:18px 0 0;font-size:15px;color:#16150f;line-height:1.55">Qualquer dúvida, é só me chamar.</p>
+        <span style="color:#7a5600">${esc(CONFIG.urlSite)}</span><br>
+        Abra também no celular e adicione na tela inicial: é lá que o áudio ajuda mais.</p>
+
+      <p style="margin:0 0 14px;font-size:15px;color:#16150f;line-height:1.6">
+        <b>Minha sugestão de uso:</b> lance ao longo do dia, não no fim do mês.
+        São menos de 30 segundos por atividade, e com o áudio dá para fazer no corredor.
+        Em duas semanas você já tem o seu próprio retrato de onde o tempo está indo.</p>
+      <p style="margin:0 0 0;font-size:15px;color:#16150f;line-height:1.6">
+        Qualquer dúvida, é só me chamar.</p>
     </td></tr>
     <tr><td style="padding:22px 30px 26px">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -1446,15 +1504,28 @@ function emailTexto(c) {
   const primeiro = String(c.nome).trim().split(/\s+/)[0];
   return `Oi, ${primeiro}!
 
-Seu acesso ao sistema de acompanhamento das atividades das BPs já está liberado.
-É nele que a gente registra a rotina do dia a dia e enxerga, em números, quanto do nosso tempo está em atividade estratégica.
+Seu acesso está liberado. Esse sistema existe para facilitar a rotina das BPs, então, em vez de um manual, deixa eu te contar direto o que ele resolve.
 
-Como entrar:
+Estão mapeadas 152 atividades da rotina das BPs, cada uma classificada entre operacional, tática e estratégica. O que faltava era enxergar, em número, para onde o tempo vai de verdade. É isso que ele mede, e ele é seu.
+
+O nome não foi por acaso: Ritmo, Rotina e Ritual é o nosso valor sobre planejamento e disciplina. É disso que se trata aqui.
+
+O QUE MUDA NO SEU DIA A DIA
+
+${GANHOS.map(([t, d]) => '- ' + t + ': ' + d).join('\n\n')}
+
+É UM ESPAÇO SEU
+Você vê e edita apenas os seus próprios lançamentos. O registro de uma não aparece para a outra, a não ser quando é marcada nele. E a senha é sua, ninguém mais tem acesso a ela.
+
+PARA ENTRAR
 1. Abra ${CONFIG.urlSite}
 2. Clique em "Criar meu acesso"
 3. Use o e-mail ${c.email} e escolha uma senha sua, de no mínimo 6 caracteres
 
-No primeiro acesso vale dar uma olhada no Catálogo: são as 152 atividades que a gente mapeou, e você pode ajustar o que estiver diferente da sua realidade.
+Abra também no celular e adicione na tela inicial: é lá que o áudio ajuda mais.
+
+MINHA SUGESTÃO DE USO
+Lance ao longo do dia, não no fim do mês. São menos de 30 segundos por atividade, e com o áudio dá para fazer no corredor. Em duas semanas você já tem o seu próprio retrato de onde o tempo está indo.
 
 Qualquer dúvida, é só me chamar.
 

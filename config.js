@@ -1,5 +1,5 @@
 // =====================================================================
-// CIMED · Atividades BP · Pouso Alegre
+// CIMED · Ritmo · BPs de Pouso Alegre
 // ÚNICO ARQUIVO QUE VOCÊ PRECISA EDITAR
 // =====================================================================
 //
