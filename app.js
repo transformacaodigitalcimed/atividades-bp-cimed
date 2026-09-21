@@ -5,7 +5,7 @@
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=6';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=7';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -448,10 +448,12 @@ function blocoDitado() {
   </div>`;
 }
 
-function ligarVoz() {
+/* Liga os microfones de campo dentro de um pedaço da tela.
+   `idMsg` é onde o recado de erro aparece: no formulário de registro é
+   reg-msg, na ficha da atividade é ficha-msg. */
+function ligarMics(raiz, idMsg) {
   if (!TEM_VOZ) return;
-
-  document.querySelectorAll('[data-mic]').forEach(b => b.onclick = () => {
+  (raiz || document).querySelectorAll('[data-mic]').forEach(b => b.onclick = () => {
     if (b.classList.contains('gravando')) { pararVoz(); return; }
     pararVoz();
     const campo = el(b.dataset.mic);
@@ -459,14 +461,23 @@ function ligarVoz() {
     b.classList.add('gravando');
     b.querySelector('span').textContent = 'Ouvindo';
     const encerra = () => { b.classList.remove('gravando'); b.querySelector('span').textContent = 'Ditar'; };
+    const falhou = e => {
+      encerra();
+      if (el(idMsg)) mostrarMsg(idMsg, 'erro', recadoVoz(e));
+    };
     try {
       ouvir({
         onParcial: t => { campo.value = base + t; },
         onFim: encerra,
-        onErro: e => { encerra(); mostrarMsg('reg-msg', 'erro', recadoVoz(e)); }
+        onErro: falhou
       });
-    } catch (e) { encerra(); mostrarMsg('reg-msg', 'erro', recadoVoz()); }
+    } catch (e) { falhou(); }
   });
+}
+
+function ligarVoz() {
+  if (!TEM_VOZ) return;
+  ligarMics(document, 'reg-msg');
 
   const bt = el('btn-ditar');
   if (!bt) return;
@@ -1129,12 +1140,15 @@ function abrirFicha(a) {
         <select id="fi-nivel">${NIVEIS.map(n => `<option ${n === d.nivel ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
     </div>
     <div style="margin-top:14px">
-      <label class="lab" for="fi-atividade">Atividade</label>
+      <div class="lab-linha"><label class="lab" for="fi-atividade">Atividade</label>
+        ${botaoMic('fi-atividade', 'o nome da atividade')}</div>
       <input type="text" id="fi-atividade" value="${esc(d.atividade)}">
     </div>
     <div style="margin-top:14px">
-      <label class="lab" for="fi-descricao">Descrição</label>
-      <textarea id="fi-descricao">${esc(d.descricao || '')}</textarea>
+      <div class="lab-linha"><label class="lab" for="fi-descricao">Descrição</label>
+        ${botaoMic('fi-descricao', 'a descrição')}</div>
+      <textarea id="fi-descricao" style="min-height:120px">${esc(d.descricao || '')}</textarea>
+      ${TEM_VOZ ? '<div class="mini" style="margin-top:6px">Descrição longa? Toque em Ditar e fale. O texto vai sendo escrito e você ajusta depois.</div>' : ''}
     </div>
     <div class="linha-campos lc3" style="margin-top:14px">
       <div><label class="lab" for="fi-valor">Gera valor?</label>
@@ -1165,12 +1179,14 @@ function abrirFicha(a) {
     if (el('fi-perm').value === 'Fica') dest.value = 'Permanece na BP';
     else if (dest.value === 'Permanece na BP') dest.value = '';
   };
-  el('fi-cancelar').onclick = () => el('dlg').close();
+  el('fi-cancelar').onclick = () => { pararVoz(); el('dlg').close(); };
   el('fi-salvar').onclick = () => salvarFicha(nova ? null : d.id);
   if (el('fi-desativar')) el('fi-desativar').onclick = () => desativarAtividade(d);
+  ligarMics(el('dlg-corpo'), 'ficha-msg');
 }
 
 async function salvarFicha(id) {
+  pararVoz();
   const dados = {
     processo: el('fi-processo').value.trim(),
     atividade: el('fi-atividade').value.trim(),
