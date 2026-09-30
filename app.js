@@ -5,7 +5,7 @@
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=13';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=14';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -494,25 +494,64 @@ function botaoMic(idCampo, oQue) {
 }
 
 function blocoDitado() {
-  if (!TEM_VOZ) return `<div class="aviso"><span>ℹ</span><div>O ditado por voz não funciona
-    neste navegador. No celular, use o Chrome (Android) ou o Safari (iPhone).</div></div>`;
+  const svgLupa = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`;
   return `<div class="ditado">
-    <div class="topo-d">
-      <button type="button" class="bt bt-voz" id="btn-ditar">${SVG_MIC}<span>Ditar a demanda</span></button>
-      <span class="mini" style="flex:1 1 180px">Fale o que você fez. Eu procuro a atividade
-        no catálogo e preencho os campos.</span>
+    <div class="lab-linha">
+      <label class="lab" for="busca-ativ">Encontrar a atividade</label>
+      ${TEM_VOZ ? `<button type="button" class="mic" id="btn-ditar">${SVG_MIC}<span>Ditar</span></button>` : ''}
     </div>
-    <div id="ditado-caixa" hidden>
-      <textarea id="ditado-texto" placeholder="O que você falar aparece aqui"
-        aria-label="Texto ditado, dá para editar"></textarea>
-      <div class="acoes" style="margin-top:8px">
-        <button type="button" class="bt sec peq" id="btn-ditado-limpar">Limpar</button>
-        <button type="button" class="bt sec peq" id="btn-ditado-obs">Usar nas observações</button>
-        <span class="mini">Dá para corrigir e apagar à mão, é um campo de texto normal.</span>
-      </div>
+    <div class="campo-busca">
+      <span class="lupa">${svgLupa}</span>
+      <input type="text" id="busca-ativ" autocomplete="off"
+        placeholder="Digite uma palavra: desligamento, PCD, feedback, vaga...">
+      <button type="button" class="limpa-busca" id="btn-ditado-limpar"
+        title="Limpar" aria-label="Limpar a busca" hidden>&times;</button>
+    </div>
+    <div class="mini" style="margin-top:7px">
+      Digite qualquer palavra da atividade${TEM_VOZ ? ', ou toque em Ditar e fale' : ''}.
+      Eu procuro nas ${CATALOGO_TAMANHO} atividades e preencho os campos.
+      <button type="button" class="link-mini" id="btn-ditado-obs">Usar esse texto nas observações</button>
     </div>
     <div id="ditado-sug"></div>
+    <div id="mais-usadas"></div>
   </div>`;
+}
+
+/* Quantas atividades o catálogo tem, para o texto não mentir se o
+   catálogo crescer. */
+let CATALOGO_TAMANHO = 152;
+
+/* As que a pessoa mais lançou nos últimos 60 dias viram botão de um toque.
+   Rotina de BP repete muito, e isso corta o caminho inteiro. */
+function maisUsadas() {
+  const eu = euEfetivo();
+  const limite = new Date(hojeIso());
+  limite.setDate(limite.getDate() - 60);
+  const conta = {};
+  registros
+    .filter(r => r.usuario_id === eu && r.atividade_id && new Date(r.data) >= limite)
+    .forEach(r => { conta[r.atividade_id] = (conta[r.atividade_id] || 0) + 1; });
+  return Object.entries(conta)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([id]) => catalogo.find(a => a.id === Number(id)))
+    .filter(Boolean);
+}
+
+function renderMaisUsadas() {
+  const caixa = el('mais-usadas');
+  if (!caixa) return;
+  const lista = maisUsadas();
+  if (!lista.length) { caixa.innerHTML = ''; return; }
+  caixa.innerHTML = `
+    <div class="mini" style="margin:14px 0 7px">Suas mais lançadas, toque para preencher:</div>
+    <div class="atalhos-ativ">
+      ${lista.map(a => `<button type="button" data-sug="${a.id}" title="${esc(a.processo)}">
+        ${esc(cortar(a.atividade, 42))}</button>`).join('')}
+    </div>`;
+  caixa.querySelectorAll('[data-sug]').forEach(b =>
+    b.onclick = () => usarSugestao(Number(b.dataset.sug)));
 }
 
 /* Liga os microfones de campo dentro de um pedaço da tela.
@@ -543,49 +582,63 @@ function ligarMics(raiz, idMsg) {
 }
 
 function ligarVoz() {
-  if (!TEM_VOZ) return;
   ligarMics(document, 'reg-msg');
 
-  const bt = el('btn-ditar');
-  if (!bt) return;
-  const campo = el('ditado-texto');
+  const campo = el('busca-ativ');
+  if (!campo) return;
+  const limpar = el('btn-ditado-limpar');
 
-  // O texto ditado é editável: as sugestões acompanham o que está escrito,
-  // venha da fala ou do teclado.
-  campo.oninput = () => { ultimoDitado = campo.value; mostrarSugestoes(campo.value); };
-  el('btn-ditado-limpar').onclick = () => {
+  CATALOGO_TAMANHO = catalogo.length || CATALOGO_TAMANHO;
+  renderMaisUsadas();
+
+  const aoMudar = () => {
+    ultimoDitado = campo.value;
+    limpar.hidden = !campo.value;
+    mostrarSugestoes(campo.value);
+  };
+  campo.oninput = aoMudar;
+  campo.onkeydown = ev => {
+    if (ev.key === 'Escape') { campo.value = ''; aoMudar(); }
+    // Enter escolhe a primeira da lista: teclado inteiro, sem tirar a mão
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      const primeira = el('ditado-sug').querySelector('[data-sug]');
+      if (primeira) primeira.click();
+    }
+  };
+
+  limpar.onclick = () => {
     pararVoz();
     campo.value = ''; ultimoDitado = '';
+    limpar.hidden = true;
     el('ditado-sug').innerHTML = '';
+    renderMaisUsadas();
     campo.focus();
   };
+
   el('btn-ditado-obs').onclick = () => {
-    const obs = el('f-obs');
     const texto = campo.value.trim();
-    if (!texto) return;
+    if (!texto) return mostrarMsg('reg-msg', 'erro', 'Escreva ou dite alguma coisa na busca primeiro.');
+    const obs = el('f-obs');
     obs.value = obs.value.trim() ? obs.value.trim() + ' ' + texto : texto;
     obs.focus();
   };
 
+  const bt = el('btn-ditar');
+  if (!bt || !TEM_VOZ) return;
   bt.onclick = () => {
     if (bt.classList.contains('gravando')) { pararVoz(); return; }
     pararVoz();
     bt.classList.add('gravando');
-    bt.querySelector('span').textContent = 'Ouvindo, toque para parar';
-    el('ditado-caixa').hidden = false;
-    // Mantém o que já estava escrito e vai acrescentando a fala no fim
+    bt.querySelector('span').textContent = 'Ouvindo';
     const base = campo.value.trim() ? campo.value.trim() + ' ' : '';
     const encerra = () => {
       bt.classList.remove('gravando');
-      bt.querySelector('span').textContent = 'Ditar a demanda';
+      bt.querySelector('span').textContent = 'Ditar';
     };
     try {
       ouvir({
-        onParcial: t => {
-          campo.value = base + t;
-          ultimoDitado = campo.value;
-          mostrarSugestoes(campo.value);
-        },
+        onParcial: t => { campo.value = base + t; aoMudar(); },
         onFim: () => { encerra(); campo.focus(); },
         onErro: e => { encerra(); mostrarMsg('reg-msg', 'erro', recadoVoz(e)); }
       });
@@ -600,29 +653,78 @@ const PALAVRAS_VAZIAS = new Set(['para', 'com', 'uma', 'dos', 'das', 'que', 'sob
   'pela', 'fiz', 'feito', 'hoje', 'ontem', 'fui', 'foi', 'sobre', 'pelos', 'pelas', 'este',
   'esta', 'isso', 'aqui', 'mais', 'muito', 'depois', 'antes', 'ainda', 'tambem', 'entao']);
 
+/* Busca por palavra-chave. Aceita palavra curta de propósito: PCD, PDI,
+   R&S e TO são o vocabulário da casa e tinham ficado de fora antes. */
 function acharNoCatalogo(texto) {
-  const p = [...new Set(semAcento(texto).split(/[^a-z0-9]+/)
-    .filter(w => w.length > 3 && !PALAVRAS_VAZIAS.has(w)))];
+  const frase = semAcento(texto).trim();
+  if (frase.length < 2) return [];
+  const p = [...new Set(frase.split(/[^a-z0-9&]+/)
+    .filter(w => w.length >= 2 && !PALAVRAS_VAZIAS.has(w)))];
   if (!p.length) return [];
+
   return catalogo.map(a => {
-    const titulo = semAcento(a.atividade + ' ' + a.processo);
+    // O nome da atividade pesa mais que o processo, e o processo mais que
+    // a descrição: quem busca "desligamento" quer primeiro a atividade que
+    // se chama assim, não uma que só cita a palavra no texto.
+    const nome = semAcento(a.atividade);
+    const titulo = nome + ' ' + semAcento(a.processo);
     const tudo = titulo + ' ' + semAcento(a.descricao);
     let pontos = 0;
-    p.forEach(w => { if (titulo.includes(w)) pontos += 2; else if (tudo.includes(w)) pontos += 1; });
+    // a frase inteira vale mais que as palavras soltas
+    if (nome.includes(frase)) pontos += 16;
+    else if (titulo.includes(frase)) pontos += 12;
+    else if (tudo.includes(frase)) pontos += 6;
+    p.forEach(w => {
+      if (nome.includes(w)) pontos += 4;
+      else if (titulo.includes(w)) pontos += 3;
+      else if (tudo.includes(w)) pontos += 1;
+      else if (w.length >= 5) {
+        // Casa a raiz da palavra, para "salario" achar "salarial",
+        // "entrevistas" achar "entrevista" e "desligamentos" achar
+        // "desligamento". Vale menos que o acerto exato.
+        const raiz = w.slice(0, w.length - 2);
+        if (titulo.includes(raiz)) pontos += 2;
+        else if (tudo.includes(raiz)) pontos += 1;
+      }
+    });
     return { a, pontos };
-  }).filter(x => x.pontos > 0).sort((x, y) => y.pontos - x.pontos).slice(0, 6).map(x => x.a);
+  }).filter(x => x.pontos > 0)
+    .sort((x, y) => y.pontos - x.pontos ||
+                    x.a.processo.localeCompare(y.a.processo, 'pt-BR'))
+    .slice(0, 8).map(x => x.a);
 }
 
 function mostrarSugestoes(texto) {
-  const achados = acharNoCatalogo(texto);
-  el('ditado-sug').innerHTML = achados.length
-    ? `<div class="mini" style="margin-top:10px">Toque na atividade certa:</div>
+  const caixa = el('ditado-sug');
+  if (!caixa) return;
+  const busca = (texto || '').trim();
+  if (busca.length < 2) { caixa.innerHTML = ''; renderMaisUsadas(); return; }
+
+  const achados = acharNoCatalogo(busca);
+  if (el('mais-usadas')) el('mais-usadas').innerHTML = '';
+
+  caixa.innerHTML = achados.length
+    ? `<div class="mini" style="margin:12px 0 2px">${achados.length}
+         ${achados.length === 1 ? 'atividade encontrada' : 'atividades encontradas'}, toque na certa:</div>
        ${achados.map(a => `<button type="button" class="chip-sug" data-sug="${a.id}">
-         <b>${esc(a.atividade)}</b><span>${esc(a.processo)} · ${esc(a.nivel)}</span></button>`).join('')}`
-    : `<div class="mini" style="margin-top:10px">Ainda não achei atividade parecida.
-       Continue falando, escolha na lista abaixo, ou use "Outra atividade".</div>`;
-  el('ditado-sug').querySelectorAll('[data-sug]').forEach(b =>
+         <b>${realcar(a.atividade, busca)}</b>
+         <span>${esc(a.processo)} · ${esc(a.nivel)}${a.permanencia === 'Sai' ? ' · sai para ' + esc(a.destino) : ''}</span>
+       </button>`).join('')}`
+    : `<div class="aviso" style="margin-top:12px"><span>🔎</span><div>
+         Não achei nada com <b>${esc(busca)}</b>. Tente outra palavra, escolha pelo
+         processo na lista abaixo, ou marque "Outra atividade (fora do catálogo)".</div></div>`;
+
+  caixa.querySelectorAll('[data-sug]').forEach(b =>
     b.onclick = () => usarSugestao(Number(b.dataset.sug)));
+}
+
+/* Deixa em negrito o pedaço que casou, para o olho achar na hora. */
+function realcar(texto, busca) {
+  const alvo = semAcento(texto), termo = semAcento(busca).trim();
+  const i = alvo.indexOf(termo);
+  if (termo.length < 2 || i < 0) return esc(texto);
+  return esc(texto.slice(0, i)) + '<mark>' + esc(texto.slice(i, i + termo.length)) +
+         '</mark>' + esc(texto.slice(i + termo.length));
 }
 
 function usarSugestao(id) {
@@ -634,10 +736,14 @@ function usarSugestao(id) {
   el('f-atividade').value = String(a.id);
   mostrarDetalhe();
   const obs = el('f-obs');
-  const ditado = el('ditado-texto') ? el('ditado-texto').value.trim() : ultimoDitado;
+  const ditado = el('busca-ativ') ? el('busca-ativ').value.trim() : ultimoDitado;
   if (!obs.value.trim() && ditado) obs.value = ditado;
-  el('ditado-sug').innerHTML = `<div class="msg ok" style="margin-top:10px">
-    Preenchi com "${esc(a.atividade)}". Confira o tempo e salve.</div>`;
+  const busca = el('busca-ativ');
+  if (busca) { busca.value = ''; }
+  if (el('btn-ditado-limpar')) el('btn-ditado-limpar').hidden = true;
+  if (el('mais-usadas')) el('mais-usadas').innerHTML = '';
+  el('ditado-sug').innerHTML = `<div class="msg ok" style="margin-top:12px">
+    Preenchi com <b>${esc(a.atividade)}</b>. Confira o tempo e salve.</div>`;
   el('f-minutos').focus();
 }
 
@@ -710,7 +816,7 @@ async function salvarRegistro() {
       : 'Registro salvo.');
     el('f-obs').value = ''; el('f-atividade').value = ''; el('detalhe-atividade').innerHTML = '';
     if (el('f-livre-nome')) el('f-livre-nome').value = '';
-    renderUltimos(); atualizarAreas(); atualizarSino();
+    renderUltimos(); atualizarAreas(); atualizarSino(); renderMaisUsadas();
   } catch (e) {
     mostrarMsg('reg-msg', 'erro', traduzErro(e));
   } finally {
