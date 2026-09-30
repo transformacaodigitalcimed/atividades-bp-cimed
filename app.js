@@ -5,7 +5,7 @@
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=14';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=15';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -263,6 +263,7 @@ function telaRegistrar(c) {
   <div class="card">
     <h3>Registrar atividade</h3>
     <p class="sub">Lance o que foi feito no dia. Leva menos de um minuto por registro.</p>
+    <div id="placar-dia"></div>
     <div id="reg-msg"></div>
     ${blocoDitado()}
     <div class="linha-campos lc3">
@@ -342,6 +343,7 @@ function telaRegistrar(c) {
   el('btn-limpar').onclick = () => ir('registrar');
   ligarVoz();
   ligarMencoes('f-obs', 'obs-mencoes');
+  renderPlacarDia();
   renderUltimos();
 }
 
@@ -816,12 +818,54 @@ async function salvarRegistro() {
       : 'Registro salvo.');
     el('f-obs').value = ''; el('f-atividade').value = ''; el('detalhe-atividade').innerHTML = '';
     if (el('f-livre-nome')) el('f-livre-nome').value = '';
-    renderUltimos(); atualizarAreas(); atualizarSino(); renderMaisUsadas();
+    renderUltimos(); atualizarAreas(); atualizarSino(); renderMaisUsadas(); renderPlacarDia();
   } catch (e) {
     mostrarMsg('reg-msg', 'erro', traduzErro(e));
   } finally {
     botao.disabled = false; botao.textContent = 'Salvar registro';
   }
+}
+
+
+/* Somatória do dia, pedida pelas BPs: conforme lança, ela vê quanto já
+   somou hoje e na semana, sem precisar sair da tela de registro. */
+function renderPlacarDia() {
+  const caixa = el('placar-dia');
+  if (!caixa) return;
+  const eu = euEfetivo();
+  const hoje = hojeIso();
+
+  // segunda-feira desta semana
+  const d = new Date(hoje + 'T12:00:00');
+  const segunda = new Date(d);
+  segunda.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  const inicioSemana = isoLocal(segunda);
+
+  const meus = registros.filter(r => r.usuario_id === eu);
+  const doDia = meus.filter(r => r.data === hoje);
+  const daSemana = meus.filter(r => r.data >= inicioSemana && r.data <= hoje);
+  const minDia = doDia.reduce((s, r) => s + r.minutos, 0);
+  const minSemana = daSemana.reduce((s, r) => s + r.minutos, 0);
+  const estrategico = doDia.filter(r => r.nivel === 'Estratégico' || r.nivel === 'Tático')
+                           .reduce((s, r) => s + r.minutos, 0);
+
+  caixa.innerHTML = `<div class="placar">
+    <div class="pl-item destaque">
+      <span class="pl-rot">Hoje</span>
+      <b class="num">${doDia.length ? horas(minDia) : '0min'}</b>
+      <span class="pl-pe">${doDia.length} ${doDia.length === 1 ? 'registro' : 'registros'}</span>
+    </div>
+    <div class="pl-item">
+      <span class="pl-rot">Estratégico + tático hoje</span>
+      <b class="num">${minDia ? Math.round(estrategico / minDia * 100) + '%' : '0%'}</b>
+      <span class="pl-pe">${horas(estrategico)}</span>
+    </div>
+    <div class="pl-item">
+      <span class="pl-rot">Esta semana</span>
+      <b class="num">${horas(minSemana)}</b>
+      <span class="pl-pe">${daSemana.length} ${daSemana.length === 1 ? 'registro' : 'registros'}</span>
+    </div>
+  </div>`;
 }
 
 function renderUltimos() {
@@ -1278,25 +1322,90 @@ function telaCatalogo(c) {
       <div style="flex:0 0 auto"><button class="bt" id="btn-nova-ativ">Nova atividade</button></div>
     </div>
     <div id="cat-msg"></div>
-    <p class="dica-editar">Clique em qualquer linha para abrir a ficha e editar.
-      O sistema guarda quem alterou e quando.</p>
+    <div class="linha-dica">
+      <p class="dica-editar">Clique em qualquer linha para abrir a ficha e editar.
+        O sistema guarda quem alterou e quando.</p>
+      <div class="troca-visao">
+        <button type="button" id="cat-ver-lista" class="aba" aria-selected="true">Lista</button>
+        <button type="button" id="cat-ver-grupo" class="aba" aria-selected="false">Por processo</button>
+      </div>
+    </div>
     <div id="cat-lista"></div>
   </div>`;
   ['c-busca', 'c-proc', 'c-nivel', 'c-perm', 'c-dest'].forEach(id => {
     el(id).oninput = renderCatalogo; el(id).onchange = renderCatalogo;
   });
   el('btn-nova-ativ').onclick = () => abrirFicha(null);
+  el('cat-ver-lista').onclick = () => { visaoCatalogo = 'lista'; trocarVisaoCatalogo(); };
+  el('cat-ver-grupo').onclick = () => { visaoCatalogo = 'grupo'; trocarVisaoCatalogo(); };
+  trocarVisaoCatalogo();
+}
+
+/* "Seria interessante ter a base das atividades e suas ramificações":
+   a visão por processo mostra a árvore, processo por processo, com a
+   contagem de cada um. A lista corrida continua ali para quem prefere. */
+let visaoCatalogo = 'lista';
+
+function trocarVisaoCatalogo() {
+  el('cat-ver-lista').setAttribute('aria-selected', visaoCatalogo === 'lista');
+  el('cat-ver-grupo').setAttribute('aria-selected', visaoCatalogo === 'grupo');
   renderCatalogo();
 }
-function renderCatalogo() {
+
+function catalogoFiltrado() {
   const b = el('c-busca').value.toLowerCase().trim();
-  const l = catalogo
+  return catalogo
     .filter(a => !el('c-proc').value || a.processo === el('c-proc').value)
     .filter(a => !el('c-nivel').value || a.nivel === el('c-nivel').value)
     .filter(a => !el('c-perm').value || a.permanencia === el('c-perm').value)
     .filter(a => !el('c-dest').value || a.destino === el('c-dest').value)
     .filter(a => !b || (a.atividade + ' ' + a.processo + ' ' + (a.descricao || '')).toLowerCase().includes(b));
-  el('cat-lista').innerHTML = l.length ? `
+}
+
+function renderCatalogoPorProcesso(l) {
+  const grupos = {};
+  l.forEach(a => { (grupos[a.processo] = grupos[a.processo] || []).push(a); });
+  const nomes = Object.keys(grupos).sort((x, y) => x.localeCompare(y, 'pt-BR'));
+  const buscando = el('c-busca').value.trim().length > 0;
+
+  el('cat-lista').innerHTML = `
+    <div class="mini" style="margin-bottom:10px">${nomes.length}
+      ${nomes.length === 1 ? 'processo' : 'processos'} · ${l.length}
+      ${l.length === 1 ? 'atividade' : 'atividades'}</div>
+    <div class="arvore">
+      ${nomes.map(nome => {
+        const itens = grupos[nome];
+        const fica = itens.filter(a => a.permanencia === 'Fica').length;
+        return `<details class="ramo"${buscando || nomes.length <= 3 ? ' open' : ''}>
+          <summary>
+            <span class="ramo-nome">${esc(nome)}</span>
+            <span class="ramo-conta">${itens.length}</span>
+            ${fica < itens.length ? `<span class="tag t-sai">${itens.length - fica} sai</span>` : ''}
+          </summary>
+          <div class="ramo-itens">
+            ${itens.map(a => `<button type="button" class="folha" data-ficha="${a.id}">
+              <span class="fo-nome">${esc(a.atividade)}</span>
+              <span class="fo-meta">
+                <span class="tag ${CLS_NIVEL[a.nivel]}"><i class="pt" style="background:${COR_NIVEL[a.nivel]}"></i>${esc(a.nivel)}</span>
+                <span class="tag ${a.gera_valor === 'Sim' ? 't-es' : 't-neu'}">${a.gera_valor === 'Sim' ? 'gera valor' : 'não gera valor'}</span>
+                <span class="tag ${a.permanencia === 'Fica' ? 't-am' : 't-sai'}">${esc(a.destino)}</span>
+              </span>
+              ${a.descricao ? `<span class="fo-desc">${esc(a.descricao)}</span>` : ''}
+            </button>`).join('')}
+          </div>
+        </details>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderCatalogo() {
+  const l = catalogoFiltrado();
+  if (!l.length) {
+    el('cat-lista').innerHTML = '<div class="vazio">Nada encontrado com esses filtros.</div>';
+    return;
+  }
+  if (visaoCatalogo === 'grupo') { renderCatalogoPorProcesso(l); ligarFichas(); return; }
+  el('cat-lista').innerHTML = `
     <div class="mini" style="margin-bottom:8px">${l.length} atividade${l.length > 1 ? 's' : ''} no filtro</div>
     <div class="tabela-wrap"><table>
     <thead><tr><th style="width:44px">ID</th><th style="width:180px">Processo</th><th>Atividade</th>
@@ -1308,12 +1417,15 @@ function renderCatalogo() {
       <td data-r="Nível"><span class="tag ${CLS_NIVEL[a.nivel]}"><i class="pt" style="background:${COR_NIVEL[a.nivel]}"></i>${esc(a.nivel)}</span></td>
       <td data-r="Gera valor"><span class="tag ${a.gera_valor === 'Sim' ? 't-es' : 't-neu'}">${esc(a.gera_valor)}</span></td>
       <td data-r="Destino"><span class="tag ${a.permanencia === 'Fica' ? 't-am' : 't-sai'}">${esc(a.destino)}</span></td>
-    </tr>`).join('')}</tbody></table></div>` : '<div class="vazio">Nada encontrado com esses filtros.</div>';
+    </tr>`).join('')}</tbody></table></div>`;
+  ligarFichas();
+}
 
-  document.querySelectorAll('[data-ficha]').forEach(tr => {
-    const abrir = () => abrirFicha(catalogo.find(x => x.id === Number(tr.dataset.ficha)));
-    tr.onclick = abrir;
-    tr.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrir(); } };
+function ligarFichas() {
+  document.querySelectorAll('[data-ficha]').forEach(e => {
+    const abrir = () => abrirFicha(catalogo.find(x => x.id === Number(e.dataset.ficha)));
+    e.onclick = abrir;
+    e.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrir(); } };
   });
 }
 
