@@ -5,7 +5,7 @@
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=15';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=16';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -295,6 +295,10 @@ function telaRegistrar(c) {
         <div><label class="lab" for="f-livre-nivel">Nível</label>
           <select id="f-livre-nivel">${NIVEIS.map(n => `<option>${n}</option>`).join('')}</select></div>
       </div>
+      <div id="livre-evidencia"></div>
+      <div class="mini" style="margin-top:10px">Vai repetir essa atividade?
+        <button type="button" class="link-mini" id="btn-livre-criar">Coloque ela no catálogo</button>,
+        aí ela entra nos painéis e serve para todas.</div>
     </div>
     <div id="detalhe-atividade"></div>
     <div class="linha-campos lc2" style="margin-top:14px">
@@ -336,15 +340,106 @@ function telaRegistrar(c) {
     const lista = catalogo.filter(a => a.processo === p);
     sel.disabled = false;
     sel.innerHTML = '<option value="">Selecione a atividade</option>' +
-      lista.map(a => `<option value="${a.id}">${esc(a.atividade)}</option>`).join('');
-    sel.onchange = mostrarDetalhe;
+      lista.map(a => `<option value="${a.id}">${esc(a.atividade)}</option>`).join('') +
+      '<option value="__nova__">+ Criar nova atividade neste processo</option>';
+    sel.onchange = () => {
+      if (sel.value === '__nova__') {
+        sel.value = '';
+        criarAtividadeDoRegistro(el('busca-ativ') ? el('busca-ativ').value.trim() : '');
+        return;
+      }
+      mostrarDetalhe();
+    };
   };
   el('btn-salvar').onclick = salvarRegistro;
   el('btn-limpar').onclick = () => ir('registrar');
+  ligarSugestaoNivel('f-livre-nome', 'f-livre-nivel', 'livre-evidencia');
+  el('btn-livre-criar').onclick = () =>
+    criarAtividadeDoRegistro(el('f-livre-nome').value.trim());
   ligarVoz();
   ligarMencoes('f-obs', 'obs-mencoes');
   renderPlacarDia();
   renderUltimos();
+}
+
+
+/* =====================================================================
+   5d. Como a equipe classificou casos parecidos
+
+   Uma BP pediu que o sistema classificasse sozinho o nível. Testei:
+   treinando no próprio catálogo e validando atividade por atividade, o
+   acerto fica em 54%. Preencher sozinho um campo que erra metade das vezes
+   estragaria o indicador que o sistema existe para medir.
+
+   Então em vez de adivinhar, o painel mostra evidência: as atividades mais
+   parecidas e o nível que VOCÊS deram a elas. A decisão continua de quem
+   conhece o trabalho.
+   ===================================================================== */
+
+function palavrasDe(texto) {
+  return semAcento(texto).split(/[^a-z0-9]+/)
+    .filter(w => w.length >= 4 && !PALAVRAS_VAZIAS.has(w));
+}
+
+/* Acha as atividades mais parecidas, dando mais peso a palavra rara:
+   "colaborador" aparece em tudo e informa pouco, "absenteísmo" informa muito. */
+function parecidasNoCatalogo(texto, quantas) {
+  const p = palavrasDe(texto);
+  if (!p.length || !catalogo.length) return [];
+  const freq = {};
+  catalogo.forEach(a => new Set(palavrasDe(a.atividade + ' ' + a.processo + ' ' +
+    (a.descricao || ''))).forEach(w => { freq[w] = (freq[w] || 0) + 1; }));
+
+  return catalogo.map(a => {
+    const alvo = new Set(palavrasDe(a.atividade + ' ' + a.processo + ' ' + (a.descricao || '')));
+    let nota = 0;
+    p.forEach(w => {
+      if (alvo.has(w)) nota += Math.log(1 + catalogo.length / (1 + (freq[w] || 0)));
+    });
+    return { a, nota };
+  }).filter(x => x.nota > 0)
+    .sort((x, y) => y.nota - x.nota)
+    .slice(0, quantas || 5)
+    .map(x => x.a);
+}
+
+/* Liga o painel de evidência a um par campo de texto + seletor de nível.
+   Nunca troca o seletor sozinho: quem clica é a pessoa. */
+function ligarSugestaoNivel(idTexto, idNivel, idCaixa) {
+  const campo = el(idTexto), seletor = el(idNivel), caixa = el(idCaixa);
+  if (!campo || !seletor || !caixa) return;
+
+  const avaliar = () => {
+    const texto = campo.value.trim();
+    if (texto.length < 6) { caixa.innerHTML = ''; return; }
+    const parecidas = parecidasNoCatalogo(texto, 4);
+    if (!parecidas.length) {
+      caixa.innerHTML = `<div class="evidencia"><span class="ev-tit">Nenhuma atividade
+        parecida no catálogo.</span><span class="ev-nota">Escolha o nível pelo tipo de
+        trabalho: fazer e organizar é operacional, acompanhar e orientar é tático,
+        decidir e construir com a liderança é estratégico.</span></div>`;
+      return;
+    }
+    // Mostra as parecidas e deixa a pessoa decidir. Nada de contar votos
+    // nem sugerir um nível: medi, e o "voto da maioria" acerta 57%, perto
+    // demais de jogar moeda para influenciar quem sabe do assunto.
+    caixa.innerHTML = `<div class="evidencia">
+      <span class="ev-tit">Como vocês classificaram casos parecidos</span>
+      <div class="ev-lista">
+        ${parecidas.map(a => `<button type="button" class="ev-item" data-ver-ficha="${a.id}"
+          title="Abrir a ficha de ${esc(a.atividade)}">
+          <span class="tag ${CLS_NIVEL[a.nivel]}"><i class="pt" style="background:${COR_NIVEL[a.nivel]}"></i>${esc(a.nivel)}</span>
+          <span class="ev-nome">${esc(cortar(a.atividade, 44))}</span>
+        </button>`).join('')}
+      </div>
+      <span class="ev-nota">Isso é o que a equipe já decidiu em casos próximos,
+        não um palpite do sistema. A escolha do nível é sua.</span>
+    </div>`;
+  };
+
+  let espera = null;
+  campo.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(avaliar, 350); });
+  avaliar();
 }
 
 /* =====================================================================
@@ -713,11 +808,41 @@ function mostrarSugestoes(texto) {
          <span>${esc(a.processo)} · ${esc(a.nivel)}${a.permanencia === 'Sai' ? ' · sai para ' + esc(a.destino) : ''}</span>
        </button>`).join('')}`
     : `<div class="aviso" style="margin-top:12px"><span>🔎</span><div>
-         Não achei nada com <b>${esc(busca)}</b>. Tente outra palavra, escolha pelo
-         processo na lista abaixo, ou marque "Outra atividade (fora do catálogo)".</div></div>`;
+         Não achei <b>${esc(busca)}</b> no catálogo. Tente outra palavra, ou
+         <button type="button" class="link-mini" id="btn-criar-daqui">crie essa atividade agora</button>.
+         Ela passa a valer para todas as BPs.</div></div>`;
 
   caixa.querySelectorAll('[data-sug]').forEach(b =>
     b.onclick = () => usarSugestao(Number(b.dataset.sug)));
+
+  const criar = el('btn-criar-daqui');
+  if (criar) criar.onclick = () => criarAtividadeDoRegistro(busca);
+}
+
+/* Cria a atividade sem sair da rotina: abre a ficha já com o que a pessoa
+   digitou, e ao salvar volta para o registro com ela escolhida. Assim a
+   atividade nova entra no catálogo e serve para todas, em vez de virar um
+   texto solto que nenhum painel consegue somar. */
+function criarAtividadeDoRegistro(nome) {
+  const proc = el('f-processo') && el('f-processo').value !== '__livre__'
+    ? el('f-processo').value : '';
+  abrirFicha(null, {
+    nomeInicial: nome || '',
+    processoInicial: proc,
+    aoCriar: nova => {
+      el('f-processo').value = nova.processo;
+      el('f-processo').onchange();
+      el('f-atividade').value = String(nova.id);
+      mostrarDetalhe();
+      el('ditado-sug').innerHTML = `<div class="msg ok" style="margin-top:12px">
+        Criei <b>${esc(nova.atividade)}</b> no catálogo e já preenchi aqui.
+        Confira o tempo e salve.</div>`;
+      const b = el('busca-ativ');
+      if (b) { b.value = ''; }
+      if (el('btn-ditado-limpar')) el('btn-ditado-limpar').hidden = true;
+      el('f-minutos').focus();
+    }
+  });
 }
 
 /* Deixa em negrito o pedaço que casou, para o olho achar na hora. */
@@ -1432,9 +1557,11 @@ function ligarFichas() {
 /* ---------------------------------------------------------------------
    Ficha da atividade: abre ao clicar na linha. `a` null cria uma nova.
    --------------------------------------------------------------------- */
-function abrirFicha(a) {
+function abrirFicha(a, opcoes) {
+  const op = opcoes || {};
   const nova = !a;
-  const d = a || { processo: '', atividade: '', descricao: '', nivel: 'Tático',
+  const d = a || { processo: op.processoInicial || '', atividade: op.nomeInicial || '',
+                   descricao: '', nivel: 'Tático',
                    gera_valor: 'Sim', permanencia: 'Fica', destino: 'Permanece na BP' };
   const destinos = [...new Set(catalogo.map(x => x.destino).filter(Boolean))].sort();
   const quem = d.alterado_por ? nomeDe(d.alterado_por) : null;
@@ -1454,6 +1581,7 @@ function abrirFicha(a) {
         ${botaoMic('fi-atividade', 'o nome da atividade')}</div>
       <input type="text" id="fi-atividade" value="${esc(d.atividade)}">
     </div>
+    <div id="fi-evidencia"></div>
     <div style="margin-top:14px">
       <div class="lab-linha"><label class="lab" for="fi-descricao">Descrição</label>
         ${botaoMic('fi-descricao', 'a descrição')}</div>
@@ -1490,12 +1618,14 @@ function abrirFicha(a) {
     else if (dest.value === 'Permanece na BP') dest.value = '';
   };
   el('fi-cancelar').onclick = () => { pararVoz(); el('dlg').close(); };
-  el('fi-salvar').onclick = () => salvarFicha(nova ? null : d.id);
+  el('fi-salvar').onclick = () => salvarFicha(nova ? null : d.id, op.aoCriar);
   if (el('fi-desativar')) el('fi-desativar').onclick = () => desativarAtividade(d);
   ligarMics(el('dlg-corpo'), 'ficha-msg');
+  ligarSugestaoNivel('fi-atividade', 'fi-nivel', 'fi-evidencia');
+  if (nova && op.nomeInicial) el('fi-descricao').focus();
 }
 
-async function salvarFicha(id) {
+async function salvarFicha(id, aoCriar) {
   if (travadoNaVisao('ficha-msg')) return;
   pararVoz();
   const dados = {
@@ -1528,6 +1658,7 @@ async function salvarFicha(id) {
     }
     processos = [...new Set(catalogo.map(x => x.processo))].sort((x, y) => x.localeCompare(y, 'pt-BR'));
     el('dlg').close();
+    if (!id && aoCriar) { aoCriar(salvo); return; }   // veio da tela de registro
     ir('catalogo');
     mostrarMsg('cat-msg', 'ok', id ? 'Atividade atualizada.' : 'Atividade ' + salvo.id + ' criada.');
   } catch (e) {
