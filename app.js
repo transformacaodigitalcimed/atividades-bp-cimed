@@ -5,7 +5,7 @@
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=16';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, CONFIG } from './config.js?v=17';
 
 /* ------------------------------------------------------------ constantes */
 const NIVEIS = ['Operacional', 'Tático', 'Estratégico'];
@@ -607,17 +607,13 @@ function blocoDitado() {
     </div>
     <div class="mini" style="margin-top:7px">
       Digite qualquer palavra da atividade${TEM_VOZ ? ', ou toque em Ditar e fale' : ''}.
-      Eu procuro nas ${CATALOGO_TAMANHO} atividades e preencho os campos.
+      Eu procuro nas ${catalogo.length} atividades e preencho os campos.
       <button type="button" class="link-mini" id="btn-ditado-obs">Usar esse texto nas observações</button>
     </div>
     <div id="ditado-sug"></div>
     <div id="mais-usadas"></div>
   </div>`;
 }
-
-/* Quantas atividades o catálogo tem, para o texto não mentir se o
-   catálogo crescer. */
-let CATALOGO_TAMANHO = 152;
 
 /* As que a pessoa mais lançou nos últimos 60 dias viram botão de um toque.
    Rotina de BP repete muito, e isso corta o caminho inteiro. */
@@ -685,7 +681,6 @@ function ligarVoz() {
   if (!campo) return;
   const limpar = el('btn-ditado-limpar');
 
-  CATALOGO_TAMANHO = catalogo.length || CATALOGO_TAMANHO;
   renderMaisUsadas();
 
   const aoMudar = () => {
@@ -800,17 +795,25 @@ function mostrarSugestoes(texto) {
   const achados = acharNoCatalogo(busca);
   if (el('mais-usadas')) el('mais-usadas').innerHTML = '';
 
+  // O convite para criar aparece SEMPRE. Achar 8 parecidas e nenhuma ser a
+  // certa é o caso mais comum, não o de não achar nada.
+  const convite = `<div class="criar-daqui">
+    <span>Nenhuma dessas é o que você fez?</span>
+    <button type="button" class="bt sec peq" id="btn-criar-daqui">Criar "${esc(cortar(busca, 34))}"</button>
+  </div>`;
+
   caixa.innerHTML = achados.length
     ? `<div class="mini" style="margin:12px 0 2px">${achados.length}
          ${achados.length === 1 ? 'atividade encontrada' : 'atividades encontradas'}, toque na certa:</div>
        ${achados.map(a => `<button type="button" class="chip-sug" data-sug="${a.id}">
          <b>${realcar(a.atividade, busca)}</b>
          <span>${esc(a.processo)} · ${esc(a.nivel)}${a.permanencia === 'Sai' ? ' · sai para ' + esc(a.destino) : ''}</span>
-       </button>`).join('')}`
+       </button>`).join('')}
+       ${convite}`
     : `<div class="aviso" style="margin-top:12px"><span>🔎</span><div>
-         Não achei <b>${esc(busca)}</b> no catálogo. Tente outra palavra, ou
-         <button type="button" class="link-mini" id="btn-criar-daqui">crie essa atividade agora</button>.
-         Ela passa a valer para todas as BPs.</div></div>`;
+         Não achei <b>${esc(busca)}</b> no catálogo. Tente outra palavra, ou crie
+         a atividade no botão abaixo. Ela passa a valer para todas as BPs.</div></div>
+       ${convite}`;
 
   caixa.querySelectorAll('[data-sug]').forEach(b =>
     b.onclick = () => usarSugestao(Number(b.dataset.sug)));

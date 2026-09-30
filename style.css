@@ -393,6 +393,15 @@ tr.clicavel:focus-visible{outline:2px solid var(--amarelo); outline-offset:-2px}
 .chip-sug mark{background:var(--amarelo-fundo); color:var(--amarelo-tinta);
   border-radius:4px; padding:0 3px; font-weight:800}
 
+.criar-daqui{display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  margin-top:12px; padding-top:12px; border-top:1px dashed var(--linha-forte);
+  font-size:13px; color:var(--txt3)}
+.criar-daqui span{flex:1 1 auto}
+@media (max-width:719px){
+  .criar-daqui{gap:8px}
+  .criar-daqui .bt{width:100%}
+}
+
 .atalhos-ativ{display:flex; gap:7px; flex-wrap:wrap}
 .atalhos-ativ button{background:var(--sup); border:1px solid var(--linha-forte);
   border-radius:999px; padding:7px 14px; font-size:13px; cursor:pointer;
